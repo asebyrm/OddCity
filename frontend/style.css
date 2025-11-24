@@ -1,0 +1,617 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header Styles */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 15px 25px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.logo h1 {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.8rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.balance {
+    background: linear-gradient(45deg, #f39c12, #e67e22);
+    padding: 8px 16px;
+    border-radius: 25px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
+}
+
+/* Button Styles */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    color: white;
+    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background: linear-gradient(45deg, #27ae60, #2ecc71);
+    color: white;
+    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+}
+
+.btn-warning {
+    background: linear-gradient(45deg, #f39c12, #e67e22);
+    color: white;
+    box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
+}
+
+/* Game Area */
+.game-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+}
+
+/* Coin Animation */
+.coin-container {
+    perspective: 1000px;
+    margin: 20px 0;
+}
+
+.coin {
+    width: 200px;
+    height: 200px;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.1s ease-out;
+    cursor: pointer;
+}
+
+.coin-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    border: 5px solid rgba(255, 255, 255, 0.3);
+}
+
+.coin-face.heads {
+    background: radial-gradient(circle at 30% 30%, #ffd700, #ffb347, #ff8c00);
+    color: #8b4513;
+}
+
+.coin-face.tails {
+    background: radial-gradient(circle at 30% 30%, #c0c0c0, #a8a8a8, #808080);
+    color: #2c3e50;
+    transform: rotateY(180deg);
+}
+
+.coin-text {
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+/* Coin Flip Animations */
+@keyframes flipHeads {
+    0% { transform: rotateY(0deg) rotateX(0deg); }
+    25% { transform: rotateY(450deg) rotateX(180deg) scale(0.8); }
+    50% { transform: rotateY(900deg) rotateX(360deg) scale(1.2); }
+    75% { transform: rotateY(1350deg) rotateX(540deg) scale(0.9); }
+    100% { transform: rotateY(1800deg) rotateX(720deg) scale(1); }
+}
+
+@keyframes flipTails {
+    0% { transform: rotateY(0deg) rotateX(0deg); }
+    25% { transform: rotateY(450deg) rotateX(180deg) scale(0.8); }
+    50% { transform: rotateY(900deg) rotateX(360deg) scale(1.2); }
+    75% { transform: rotateY(1350deg) rotateX(540deg) scale(0.9); }
+    100% { transform: rotateY(1980deg) rotateX(720deg) scale(1); }
+}
+
+.coin.flipping-heads {
+    animation: flipHeads 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.coin.flipping-tails {
+    animation: flipTails 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.coin:hover {
+    transform: rotateY(15deg) rotateX(5deg) scale(1.05);
+}
+
+/* Game Result */
+.game-result {
+    text-align: center;
+    padding: 20px;
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.result-text {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.result-text.win {
+    color: #2ecc71;
+    animation: pulse 1s ease-in-out infinite alternate;
+}
+
+.result-text.lose {
+    color: #e74c3c;
+}
+
+.result-details {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.05); }
+}
+
+/* Betting Controls */
+.betting-controls {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    max-width: 500px;
+    width: 100%;
+}
+
+.bet-amount {
+    margin-bottom: 25px;
+}
+
+.bet-amount label {
+    display: block;
+    color: white;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.bet-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    outline: none;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(52, 152, 219, 0.5);
+}
+
+.bet-input {
+    width: 80px;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    text-align: center;
+    font-weight: 600;
+}
+
+.bet-input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.currency {
+    font-size: 1.2rem;
+    color: #f39c12;
+}
+
+/* Choice Buttons */
+.choice-buttons {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.choice-btn {
+    flex: 1;
+    padding: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.choice-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(255, 255, 255, 0.2);
+}
+
+.choice-btn.selected {
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    border-color: #3498db;
+    box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4);
+    transform: translateY(-3px);
+}
+
+.choice-icon {
+    font-size: 2rem;
+}
+
+.choice-text {
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+}
+
+/* Play Button */
+.play-btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 15px;
+    background: linear-gradient(45deg, #e74c3c, #c0392b);
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.play-btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(231, 76, 60, 0.4);
+}
+
+.play-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Wallet Controls */
+.wallet-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Recent Games */
+.recent-games {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    max-width: 500px;
+    width: 100%;
+}
+
+.recent-games h3 {
+    color: white;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.game-history {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.game-result-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 600;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.game-result-icon.win {
+    background: linear-gradient(45deg, #2ecc71, #27ae60);
+    color: white;
+}
+
+.game-result-icon.lose {
+    background: linear-gradient(45deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 400px;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.close {
+    color: white;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    position: absolute;
+    top: 15px;
+    right: 20px;
+}
+
+.close:hover {
+    opacity: 0.7;
+}
+
+.auth-form, .wallet-form {
+    color: white;
+}
+
+.auth-form h2, .wallet-form h2 {
+    text-align: center;
+    margin-bottom: 25px;
+    color: white;
+}
+
+.auth-form input, .wallet-form input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 1rem;
+}
+
+.auth-form input::placeholder, .wallet-form input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.auth-form input:focus, .wallet-form input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.auth-form p {
+    text-align: center;
+    margin-top: 15px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.auth-form a {
+    color: #3498db;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.auth-form a:hover {
+    text-decoration: underline;
+}
+
+/* Notification */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1100;
+    max-width: 350px;
+    animation: slideIn 0.3s ease;
+}
+
+.notification-content {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #333;
+}
+
+.notification.success .notification-content {
+    border-left: 4px solid #2ecc71;
+}
+
+.notification.error .notification-content {
+    border-left: 4px solid #e74c3c;
+}
+
+.notification.info .notification-content {
+    border-left: 4px solid #3498db;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #666;
+    margin-left: 10px;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .coin {
+        width: 150px;
+        height: 150px;
+    }
+
+    .betting-controls {
+        padding: 20px;
+    }
+
+    .choice-buttons {
+        flex-direction: column;
+    }
+
+    .wallet-controls {
+        justify-content: center;
+    }
+
+    .modal-content {
+        margin: 20% auto;
+        width: 95%;
+    }
+}

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OddCity - Coin Flip Game</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <h1>🏛️ OddCity</h1>
+            </div>
+            <div class="user-info">
+                <div id="balance" class="balance">💰 0.00 VIRTUAL</div>
+                <div id="userSection" class="user-section">
+                    <button id="loginBtn" class="btn btn-secondary">Giriş Yap</button>
+                    <button id="registerBtn" class="btn btn-secondary">Kayıt Ol</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Game Area -->
+        <main class="game-area">
+            <!-- Login/Register Forms -->
+            <div id="authModal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <div id="loginForm" class="auth-form">
+                        <h2>Giriş Yap</h2>
+                        <form id="loginFormElement">
+                            <input type="email" id="loginEmail" placeholder="E-posta" required>
+                            <input type="password" id="loginPassword" placeholder="Şifre" required>
+                            <button type="submit" class="btn btn-primary">Giriş Yap</button>
+                        </form>
+                        <p>Hesabınız yok mu? <a href="#" id="showRegister">Kayıt olun</a></p>
+                    </div>
+                    <div id="registerForm" class="auth-form hidden">
+                        <h2>Kayıt Ol</h2>
+                        <form id="registerFormElement">
+                            <input type="email" id="registerEmail" placeholder="E-posta" required>
+                            <input type="password" id="registerPassword" placeholder="Şifre" required>
+                            <button type="submit" class="btn btn-primary">Kayıt Ol</button>
+                        </form>
+                        <p>Hesabınız var mı? <a href="#" id="showLogin">Giriş yapın</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coin Animation -->
+            <div class="coin-container">
+                <div id="coin" class="coin">
+                    <div class="coin-face heads">
+                        <div class="coin-text">YAZI</div>
+                    </div>
+                    <div class="coin-face tails">
+                        <div class="coin-text">TURA</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Result -->
+            <div id="gameResult" class="game-result hidden">
+                <div class="result-text"></div>
+                <div class="result-details"></div>
+            </div>
+
+            <!-- Betting Controls -->
+            <div id="gameControls" class="betting-controls hidden">
+                <div class="bet-amount">
+                    <label for="betSlider">Bahis Miktarı:</label>
+                    <div class="bet-input-group">
+                        <input type="range" id="betSlider" min="1" max="100" value="10" class="slider">
+                        <input type="number" id="betAmount" min="1" max="100" value="10" class="bet-input">
+                        <span class="currency">💰</span>
+                    </div>
+                </div>
+
+                <div class="choice-buttons">
+                    <button id="chooseHeads" class="choice-btn" data-choice="yazi">
+                        <span class="choice-icon">🪙</span>
+                        <span class="choice-text">YAZI</span>
+                    </button>
+                    <button id="chooseTails" class="choice-btn" data-choice="tura">
+                        <span class="choice-icon">🌟</span>
+                        <span class="choice-text">TURA</span>
+                    </button>
+                </div>
+
+                <button id="playBtn" class="play-btn" disabled>
+                    <span class="btn-text">🎮 OYNA!</span>
+                    <div class="btn-loading hidden">
+                        <div class="spinner"></div>
+                        <span>Atılıyor...</span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Wallet Controls -->
+            <div id="walletControls" class="wallet-controls hidden">
+                <button id="depositBtn" class="btn btn-success">💰 Para Yatır</button>
+                <button id="withdrawBtn" class="btn btn-warning">💸 Para Çek</button>
+                <button id="logoutBtn" class="btn btn-secondary">Çıkış Yap</button>
+            </div>
+
+            <!-- Recent Games -->
+            <div id="recentGames" class="recent-games hidden">
+                <h3>Son Oyunlar</h3>
+                <div id="gameHistory" class="game-history"></div>
+            </div>
+        </main>
+
+        <!-- Wallet Modal -->
+        <div id="walletModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <div id="walletForm" class="wallet-form">
+                    <h2 id="walletTitle">Para İşlemi</h2>
+                    <form id="walletFormElement">
+                        <input type="number" id="walletAmount" placeholder="Miktar" min="1" step="0.01" required>
+                        <button type="submit" class="btn btn-primary" id="walletSubmitBtn">Onayla</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification -->
+        <div id="notification" class="notification hidden">
+            <div class="notification-content">
+                <span class="notification-message"></span>
+                <button class="notification-close">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
