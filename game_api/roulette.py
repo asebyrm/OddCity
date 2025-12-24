@@ -92,7 +92,7 @@ def play_roulette():
 
         # Deduct bet amount
         cursor.execute("UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s", (amount, wallet_id))
-        cursor.execute("INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, 'BET')", (wallet_id, amount))
+        cursor.execute("INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'BET')", (user_id, wallet_id, amount))
 
         # Play Roulette
         winning_number = random.randint(0, 36)
@@ -114,7 +114,7 @@ def play_roulette():
             payout = amount * (1 + multiplier)
             
             cursor.execute("UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s", (payout, wallet_id))
-            cursor.execute("INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, 'PAYOUT')", (wallet_id, payout))
+            cursor.execute("INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'PAYOUT')", (user_id, wallet_id, payout))
 
         conn.commit()
 

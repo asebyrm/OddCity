@@ -68,7 +68,7 @@ def start_game():
         
         # Deduct bet
         cursor.execute("UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s", (amount, wallet_id))
-        cursor.execute("INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, 'BET')", (wallet_id, amount))
+        cursor.execute("INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'BET')", (user_id, wallet_id, amount))
         
         conn.commit()
         
@@ -155,6 +155,7 @@ def stand():
     return stand_logic(conn, cursor, game['wallet_id'], game['bet_amount'], game['player_hand'], game['dealer_hand'])
 
 def stand_logic(conn, cursor, wallet_id, amount, player_hand, dealer_hand, is_blackjack=False):
+    user_id = session.get('user_id')
     deck = session['bj_game']['deck']
     dealer_value = calculate_hand_value(dealer_hand)
     
@@ -198,7 +199,7 @@ def stand_logic(conn, cursor, wallet_id, amount, player_hand, dealer_hand, is_bl
         
     if payout > 0:
         cursor.execute("UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s", (payout, wallet_id))
-        cursor.execute("INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, 'PAYOUT')", (wallet_id, payout))
+        cursor.execute("INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'PAYOUT')", (user_id, wallet_id, payout))
         conn.commit()
         
     cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (wallet_id,))
