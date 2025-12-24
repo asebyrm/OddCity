@@ -4,9 +4,8 @@ class Config:
     DB_CONFIG = {
         'host': 'localhost',
         'user': 'root',
-        'password': 'root',
-        'database': 'game_db',
-        'port': 8889
+        'password': '',
+        'database': 'game_db'
     }
 
     SECRET_KEY = os.environ.get('SECRET_KEY', 'bu-hala-gizli-kalsa-iyi-olur-67890')

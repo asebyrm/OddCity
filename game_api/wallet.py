@@ -22,7 +22,7 @@ def get_my_wallet():
         sql = """
             SELECT u.email, w.balance, w.currency, w.updated_at
             FROM wallets w
-            JOIN users u ON w.user_id = u.id
+            JOIN users u ON w.user_id = u.user_id
             WHERE w.user_id = %s
         """
         cursor.execute(sql, (user_id,))
@@ -75,7 +75,7 @@ def deposit_to_wallet():
         sql_update_wallet = "UPDATE wallets SET balance = balance + %s WHERE user_id = %s"
         cursor.execute(sql_update_wallet, (amount, user_id))
 
-        sql_get_wallet = "SELECT id, balance FROM wallets WHERE user_id = %s"
+        sql_get_wallet = "SELECT wallet_id, balance FROM wallets WHERE user_id = %s"
         cursor.execute(sql_get_wallet, (user_id,))
         wallet = cursor.fetchone()
 
@@ -83,11 +83,11 @@ def deposit_to_wallet():
             conn.rollback()
             return jsonify({'message': 'Kullanıcıya ait cüzdan bulunamadı!'}), 404
 
-        wallet_id = wallet['id']
+        wallet_id = wallet['wallet_id']
         new_balance = wallet['balance']
 
-        sql_log_tx = "INSERT INTO transactions (wallet_id, amount, transaction_type) VALUES (%s, %s, %s)"
-        cursor.execute(sql_log_tx, (wallet_id, amount, 'deposit'))
+        sql_log_tx = "INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, %s)"
+        cursor.execute(sql_log_tx, (wallet_id, amount, 'DEPOSIT'))
 
         conn.commit()
 
@@ -156,7 +156,7 @@ def withdraw_from_wallet():
         sql_update_wallet = "UPDATE wallets SET balance = balance - %s WHERE user_id = %s"
         cursor.execute(sql_update_wallet, (amount, user_id))
 
-        sql_get_wallet = "SELECT id, balance FROM wallets WHERE user_id = %s"
+        sql_get_wallet = "SELECT wallet_id, balance FROM wallets WHERE user_id = %s"
         cursor.execute(sql_get_wallet, (user_id,))
         wallet = cursor.fetchone()
 
@@ -164,11 +164,11 @@ def withdraw_from_wallet():
             conn.rollback()
             return jsonify({'message': 'Kullanıcıya ait cüzdan bulunamadı!'}), 404
 
-        wallet_id = wallet['id']
+        wallet_id = wallet['wallet_id']
         new_balance = wallet['balance']
 
-        sql_log_tx = "INSERT INTO transactions (wallet_id, amount, transaction_type) VALUES (%s, %s, %s)"
-        cursor.execute(sql_log_tx, (wallet_id, amount, 'withdraw'))
+        sql_log_tx = "INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, %s)"
+        cursor.execute(sql_log_tx, (wallet_id, amount, 'WITHDRAW'))
 
         conn.commit()
 
@@ -181,7 +181,6 @@ def withdraw_from_wallet():
     except Error as e:
         if conn:
             conn.rollback()
-
         print(f"Para Çekme hatası: {e}")
         return jsonify({'message': f'Bir hata oluştu: {e}'}), 500
     finally:

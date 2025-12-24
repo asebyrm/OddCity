@@ -6,13 +6,16 @@ from mysql.connector import Error
 
 auth_bp = Blueprint('auth', __name__)
 
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             return jsonify({'message': 'Bu işlemi yapmak için giriş yapmalısınız.'}), 401
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 def admin_required(f):
     @wraps(f)
@@ -21,7 +24,9 @@ def admin_required(f):
         if not session.get('is_admin'):
             return jsonify({'message': 'Bu işlemi yapmak için admin yetkisi gerekli!'}), 403
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 @auth_bp.route('/register', methods=['POST'])
 def register_user():
@@ -53,6 +58,7 @@ def register_user():
         if cursor: cursor.close()
         if conn: conn.close()
 
+
 @auth_bp.route('/login', methods=['POST'])
 def login_user():
     data = request.get_json()
@@ -66,16 +72,20 @@ def login_user():
         conn = get_db_connection()
         if conn is None: return jsonify({'message': 'Veritabanı sunucu hatası!'}), 500
         cursor = conn.cursor(dictionary=True)
-        sql = "SELECT id, email, password_hash, is_admin FROM users WHERE email = %s"
+        sql = "SELECT user_id, email, password_hash, is_admin, status FROM users WHERE email = %s"
         cursor.execute(sql, (email,))
         user = cursor.fetchone()
 
         if user and check_password_hash(user['password_hash'], password):
-            session['user_id'] = user['id']
+            if user['status'] == 'BANNED':
+                return jsonify({'message': 'Hesabınız yasaklanmıştır.'}), 403
+
+            session['user_id'] = user['user_id']
             session['email'] = user['email']
             session['is_admin'] = user['is_admin']
             return jsonify({
-                'message': 'Giriş başarılı! Sunucu sizi hatırlayacak.'
+                'message': 'Giriş başarılı! Sunucu sizi hatırlayacak.',
+                'is_admin': bool(user['is_admin'])
             }), 200
         else:
             return jsonify({'message': 'Geçersiz e-posta veya şifre!'}), 401
@@ -85,6 +95,7 @@ def login_user():
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+
 
 @auth_bp.route('/logout', methods=['POST'])
 @login_required

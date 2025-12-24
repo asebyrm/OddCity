@@ -26,8 +26,11 @@ def create_rule_set():
         if conn is None: return jsonify({'message': 'Veritabanı sunucu hatası!'}), 500
 
         cursor = conn.cursor()
-        sql = "INSERT INTO rule_sets (name, description, house_edge) VALUES (%s, %s, %s)"
-        val = (name, description, house_edge)
+        # created_by_admin_id zorunlu, session'dan alıyoruz (admin_required zaten kontrol etti)
+        admin_id = session.get('user_id')
+        
+        sql = "INSERT INTO rule_sets (name, description, house_edge, created_by_admin_id) VALUES (%s, %s, %s, %s)"
+        val = (name, description, house_edge, admin_id)
 
         cursor.execute(sql, val)
         conn.commit()
@@ -42,3 +45,31 @@ def create_rule_set():
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+
+def get_active_rule_value(rule_type, default_value):
+    conn = get_db_connection()
+    if not conn: return default_value
+    
+    cursor = conn.cursor()
+    try:
+        # Get active rule set's rule
+        query = """
+            SELECT r.rule_value 
+            FROM rules r
+            JOIN rule_sets rs ON r.rule_set_id = rs.rule_set_id
+            WHERE rs.is_active = TRUE AND r.rule_type = %s
+            ORDER BY r.priority DESC
+            LIMIT 1
+        """
+        cursor.execute(query, (rule_type,))
+        result = cursor.fetchone()
+        
+        if result and result[0]:
+            return float(result[0])
+        return default_value
+    except Exception as e:
+        print(f"Rule fetch error: {e}")
+        return default_value
+    finally:
+        cursor.close()
+        conn.close()

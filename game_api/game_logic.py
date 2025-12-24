@@ -41,7 +41,7 @@ def play_game():
         conn.start_transaction()
         cursor = conn.cursor(dictionary=True)
 
-        sql_get_wallet = "SELECT id, balance FROM wallets WHERE user_id = %s FOR UPDATE"
+        sql_get_wallet = "SELECT wallet_id, balance FROM wallets WHERE user_id = %s FOR UPDATE"
         cursor.execute(sql_get_wallet, (user_id,))
         wallet = cursor.fetchone()
 
@@ -49,7 +49,7 @@ def play_game():
             conn.rollback()
             return jsonify({'message': 'Cüzdan bulunamadı!'}), 404
 
-        wallet_id = wallet['id']
+        wallet_id = wallet['wallet_id']
         current_balance = float(wallet['balance'])
 
         if current_balance < bet_amount:
@@ -60,10 +60,10 @@ def play_game():
                 'bet_amount': bet_amount
             }), 403
 
-        sql_debit = "UPDATE wallets SET balance = balance - %s WHERE id = %s"
+        sql_debit = "UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s"
         cursor.execute(sql_debit, (bet_amount, wallet_id))
 
-        sql_log_bet = "INSERT INTO transactions (wallet_id, amount, transaction_type) VALUES (%s, %s, 'bet')"
+        sql_log_bet = "INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, 'BET')"
         cursor.execute(sql_log_bet, (wallet_id, bet_amount))
 
         game_result = random.choice(['yazi', 'tura'])
@@ -74,15 +74,15 @@ def play_game():
         if is_win:
             payout_amount = bet_amount * PAYOUT_MULTIPLIER
 
-            sql_credit = "UPDATE wallets SET balance = balance + %s WHERE id = %s"
+            sql_credit = "UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s"
             cursor.execute(sql_credit, (payout_amount, wallet_id))
 
-            sql_log_payout = "INSERT INTO transactions (wallet_id, amount, transaction_type) VALUES (%s, %s, 'payout')"
+            sql_log_payout = "INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, 'PAYOUT')"
             cursor.execute(sql_log_payout, (wallet_id, payout_amount))
 
             conn.commit()
 
-            cursor.execute("SELECT balance FROM wallets WHERE id = %s", (wallet_id,))
+            cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (wallet_id,))
             new_balance = cursor.fetchone()['balance']
 
             return jsonify({
@@ -95,7 +95,7 @@ def play_game():
         else:
             conn.commit()
 
-            cursor.execute("SELECT balance FROM wallets WHERE id = %s", (wallet_id,))
+            cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (wallet_id,))
             new_balance = cursor.fetchone()['balance']
 
             return jsonify({
