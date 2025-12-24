@@ -86,8 +86,8 @@ def deposit_to_wallet():
         wallet_id = wallet['wallet_id']
         new_balance = wallet['balance']
 
-        sql_log_tx = "INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, %s)"
-        cursor.execute(sql_log_tx, (wallet_id, amount, 'DEPOSIT'))
+        sql_log_tx = "INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'DEPOSIT')"
+        cursor.execute(sql_log_tx, (user_id, wallet_id, amount))
 
         conn.commit()
 
@@ -167,8 +167,8 @@ def withdraw_from_wallet():
         wallet_id = wallet['wallet_id']
         new_balance = wallet['balance']
 
-        sql_log_tx = "INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, %s)"
-        cursor.execute(sql_log_tx, (wallet_id, amount, 'WITHDRAW'))
+        sql_log_tx = "INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'WITHDRAW')"
+        cursor.execute(sql_log_tx, (user_id, wallet_id, amount))
 
         conn.commit()
 

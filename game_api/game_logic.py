@@ -63,8 +63,8 @@ def play_game():
         sql_debit = "UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s"
         cursor.execute(sql_debit, (bet_amount, wallet_id))
 
-        sql_log_bet = "INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, 'BET')"
-        cursor.execute(sql_log_bet, (wallet_id, bet_amount))
+        sql_log_bet = "INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'BET')"
+        cursor.execute(sql_log_bet, (user_id, wallet_id, bet_amount))
 
         game_result = random.choice(['yazi', 'tura'])
         is_win = (choice == game_result)
@@ -77,8 +77,8 @@ def play_game():
             sql_credit = "UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s"
             cursor.execute(sql_credit, (payout_amount, wallet_id))
 
-            sql_log_payout = "INSERT INTO transactions (wallet_id, amount, tx_type) VALUES (%s, %s, 'PAYOUT')"
-            cursor.execute(sql_log_payout, (wallet_id, payout_amount))
+            sql_log_payout = "INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'PAYOUT')"
+            cursor.execute(sql_log_payout, (user_id, wallet_id, payout_amount))
 
             conn.commit()
 
