@@ -10,7 +10,7 @@ def reset_db():
     
     # Sırayla tabloları sil (Foreign Key kısıtlamaları yüzünden sıra önemli)
     tables_to_drop = [
-        'logs', 'transactions', 'payouts', 'bets', 'games', 'rules', 'rule_sets', 'wallets', 'users'
+        'logs', 'game_rule_snapshots', 'transactions', 'payouts', 'bets', 'games', 'rules', 'rule_sets', 'wallets', 'users'
     ]
 
     try:

@@ -1,10 +1,16 @@
 import random
+import json
 from flask import Blueprint, request, jsonify, session
 from .database import get_db_connection
 from .auth import login_required
+from .rules import get_active_rule_value, get_active_rule_set_id, create_rule_snapshot
 from mysql.connector import Error
 
 blackjack_bp = Blueprint('blackjack', __name__)
+
+# Varsayılan Blackjack payouts (rule system'de kural yoksa kullanılır)
+DEFAULT_BLACKJACK_PAYOUT = 2.5  # 3:2 payout
+DEFAULT_NORMAL_PAYOUT = 2.0     # Normal win
 
 # Card values
 SUITS = ['H', 'D', 'C', 'S'] # Hearts, Diamonds, Clubs, Spades
@@ -66,9 +72,27 @@ def start_game():
             
         wallet_id = wallet['wallet_id']
         
-        # Deduct bet
+        # Aktif rule set ID'sini al
+        rule_set_id = get_active_rule_set_id()
+        
+        # Game kaydı oluştur
+        sql_create_game = """
+            INSERT INTO games (user_id, rule_set_id, game_type, status)
+            VALUES (%s, %s, 'blackjack', 'ACTIVE')
+        """
+        cursor.execute(sql_create_game, (user_id, rule_set_id))
+        game_id = cursor.lastrowid
+        
+        # Bakiye düş
         cursor.execute("UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s", (amount, wallet_id))
-        cursor.execute("INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'BET')", (user_id, wallet_id, amount))
+        
+        # Bet kaydı oluştur
+        sql_create_bet = """
+            INSERT INTO bets (game_id, user_id, bet_type, bet_value, stake_amount)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql_create_bet, (game_id, user_id, 'blackjack', str(amount), amount))
+        bet_id = cursor.lastrowid
         
         conn.commit()
         
@@ -80,6 +104,8 @@ def start_game():
         dealer_hand = [deck.pop(), deck.pop()] # Second card hidden in frontend
         
         session['bj_game'] = {
+            'game_id': game_id,
+            'bet_id': bet_id,
             'deck': deck,
             'player_hand': player_hand,
             'dealer_hand': dealer_hand,
@@ -92,7 +118,7 @@ def start_game():
         
         # Check for immediate Blackjack
         if player_value == 21:
-            return stand_logic(conn, cursor, wallet_id, amount, player_hand, dealer_hand, True)
+            return stand_logic(conn, cursor, game_id, bet_id, wallet_id, amount, player_hand, dealer_hand, True)
             
         return jsonify({
             'player_hand': player_hand,
@@ -126,8 +152,43 @@ def hit():
     player_value = calculate_hand_value(player_hand)
     
     if player_value > 21:
+        # Bust durumunda oyunu bitir
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        game_id = game['game_id']
+        bet_id = game['bet_id']
+        
+        # Rule snapshot oluştur (oyun oynandığında kullanılan rule değerlerini kaydet)
+        create_rule_snapshot(game_id, get_active_rule_set_id(), 'blackjack')
+        
+        # Game sonucunu kaydet
+        game_result_json = json.dumps({
+            'player_hand': player_hand,
+            'player_value': player_value,
+            'result': 'bust',
+            'payout': 0
+        })
+        sql_update_game = """
+            UPDATE games 
+            SET game_result = %s, ended_at = NOW(), status = 'COMPLETED'
+            WHERE game_id = %s
+        """
+        cursor.execute(sql_update_game, (game_result_json, game_id))
+        
+        # Payout kaydı oluştur (LOSS)
+        sql_create_payout = """
+            INSERT INTO payouts (bet_id, win_amount, outcome)
+            VALUES (%s, 0, 'LOSS')
+        """
+        cursor.execute(sql_create_payout, (bet_id,))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
         game['status'] = 'finished'
-        session['bj_game'] = game
+        session.pop('bj_game', None)
         return jsonify({
             'player_hand': player_hand,
             'player_value': player_value,
@@ -152,9 +213,9 @@ def stand():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
-    return stand_logic(conn, cursor, game['wallet_id'], game['bet_amount'], game['player_hand'], game['dealer_hand'])
+    return stand_logic(conn, cursor, game['game_id'], game['bet_id'], game['wallet_id'], game['bet_amount'], game['player_hand'], game['dealer_hand'])
 
-def stand_logic(conn, cursor, wallet_id, amount, player_hand, dealer_hand, is_blackjack=False):
+def stand_logic(conn, cursor, game_id, bet_id, wallet_id, amount, player_hand, dealer_hand, is_blackjack=False):
     user_id = session.get('user_id')
     deck = session['bj_game']['deck']
     dealer_value = calculate_hand_value(dealer_hand)
@@ -171,6 +232,10 @@ def stand_logic(conn, cursor, wallet_id, amount, player_hand, dealer_hand, is_bl
     result = 'lose'
     message = 'Kaybettiniz.'
     
+    # Database'den payout multiplier'ları al
+    blackjack_multiplier = get_active_rule_value('blackjack_payout', DEFAULT_BLACKJACK_PAYOUT)
+    normal_multiplier = get_active_rule_value('blackjack_normal_payout', DEFAULT_NORMAL_PAYOUT)
+    
     if is_blackjack:
         # Check if dealer also has blackjack
         if dealer_value == 21 and len(dealer_hand) == 2:
@@ -178,18 +243,18 @@ def stand_logic(conn, cursor, wallet_id, amount, player_hand, dealer_hand, is_bl
             result = 'push'
             message = 'Berabere (Push)!'
         else:
-            payout = amount * 2.5 # 3:2 payout
+            payout = amount * blackjack_multiplier
             result = 'win'
             message = 'Blackjack! Kazandınız!'
     elif dealer_value > 21:
-        payout = amount * 2
+        payout = amount * normal_multiplier
         result = 'win'
         message = 'Krupiye Battı! Kazandınız!'
     elif dealer_value > player_value:
         result = 'lose'
         message = 'Krupiye Kazandı.'
     elif dealer_value < player_value:
-        payout = amount * 2
+        payout = amount * normal_multiplier
         result = 'win'
         message = 'Kazandınız!'
     else:
@@ -197,11 +262,39 @@ def stand_logic(conn, cursor, wallet_id, amount, player_hand, dealer_hand, is_bl
         result = 'push'
         message = 'Berabere (Push)!'
         
+    # Rule snapshot oluştur (oyun oynandığında kullanılan rule değerlerini kaydet)
+    create_rule_snapshot(game_id, get_active_rule_set_id(), 'blackjack')
+    
+    # Game sonucunu kaydet
+    game_result_json = json.dumps({
+        'player_hand': player_hand,
+        'dealer_hand': dealer_hand,
+        'player_value': player_value,
+        'dealer_value': dealer_value,
+        'result': result,
+        'payout': payout
+    })
+    sql_update_game = """
+        UPDATE games 
+        SET game_result = %s, ended_at = NOW(), status = 'COMPLETED'
+        WHERE game_id = %s
+    """
+    cursor.execute(sql_update_game, (game_result_json, game_id))
+    
+    # Payout kaydı oluştur
+    # PUSH durumunda outcome = 'LOSS' ama win_amount = payout (stake geri verilir)
+    outcome = 'WIN' if result == 'win' else 'LOSS'
+    sql_create_payout = """
+        INSERT INTO payouts (bet_id, win_amount, outcome)
+        VALUES (%s, %s, %s)
+    """
+    cursor.execute(sql_create_payout, (bet_id, payout, outcome))
+    
     if payout > 0:
         cursor.execute("UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s", (payout, wallet_id))
-        cursor.execute("INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'PAYOUT')", (user_id, wallet_id, payout))
-        conn.commit()
-        
+    
+    conn.commit()
+    
     cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (wallet_id,))
     new_balance = float(cursor.fetchone()['balance'])
     

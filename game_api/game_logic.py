@@ -1,12 +1,15 @@
 import random
+import json
 from flask import jsonify, request, Blueprint, session
 from .database import get_db_connection
 from .auth import login_required
+from .rules import get_active_rule_value, get_active_rule_set_id, create_rule_snapshot
 from mysql.connector import Error
 
 game_bp = Blueprint('game', __name__)
 
-PAYOUT_MULTIPLIER = 1.95
+# Varsayılan payout multiplier (rule system'de kural yoksa kullanılır)
+DEFAULT_PAYOUT_MULTIPLIER = 1.95
 
 @game_bp.route('/game/play', methods=['POST'])
 @login_required
@@ -60,25 +63,61 @@ def play_game():
                 'bet_amount': bet_amount
             }), 403
 
+        # Aktif rule set ID'sini al
+        rule_set_id = get_active_rule_set_id()
+        
+        # Game kaydı oluştur
+        sql_create_game = """
+            INSERT INTO games (user_id, rule_set_id, game_type, status)
+            VALUES (%s, %s, 'coinflip', 'ACTIVE')
+        """
+        cursor.execute(sql_create_game, (user_id, rule_set_id))
+        game_id = cursor.lastrowid
+        
+        # Bakiye düş
         sql_debit = "UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s"
         cursor.execute(sql_debit, (bet_amount, wallet_id))
 
-        sql_log_bet = "INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'BET')"
-        cursor.execute(sql_log_bet, (user_id, wallet_id, bet_amount))
+        # Bet kaydı oluştur
+        sql_create_bet = """
+            INSERT INTO bets (game_id, user_id, bet_type, bet_value, stake_amount)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql_create_bet, (game_id, user_id, 'choice', choice, bet_amount))
+        bet_id = cursor.lastrowid
 
         game_result = random.choice(['yazi', 'tura'])
         is_win = (choice == game_result)
 
         new_balance = 0.0
 
+        # Rule snapshot oluştur (oyun oynandığında kullanılan rule değerlerini kaydet)
+        create_rule_snapshot(game_id, rule_set_id, 'coinflip')
+        
+        # Game sonucunu kaydet
+        game_result_json = json.dumps({'result': game_result, 'choice': choice, 'is_win': is_win})
+        sql_update_game = """
+            UPDATE games 
+            SET game_result = %s, ended_at = NOW(), status = 'COMPLETED'
+            WHERE game_id = %s
+        """
+        cursor.execute(sql_update_game, (game_result_json, game_id))
+        
         if is_win:
-            payout_amount = bet_amount * PAYOUT_MULTIPLIER
+            # Database'den payout multiplier'ı al, yoksa varsayılan değeri kullan
+            payout_multiplier = get_active_rule_value('coinflip_payout', DEFAULT_PAYOUT_MULTIPLIER)
+            payout_amount = bet_amount * payout_multiplier
 
+            # Bakiye ekle
             sql_credit = "UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s"
             cursor.execute(sql_credit, (payout_amount, wallet_id))
 
-            sql_log_payout = "INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'PAYOUT')"
-            cursor.execute(sql_log_payout, (user_id, wallet_id, payout_amount))
+            # Payout kaydı oluştur
+            sql_create_payout = """
+                INSERT INTO payouts (bet_id, win_amount, outcome)
+                VALUES (%s, %s, 'WIN')
+            """
+            cursor.execute(sql_create_payout, (bet_id, payout_amount))
 
             conn.commit()
 
@@ -93,6 +132,13 @@ def play_game():
             }), 200
 
         else:
+            # Kayıp durumunda payout kaydı oluştur (win_amount = 0)
+            sql_create_payout = """
+                INSERT INTO payouts (bet_id, win_amount, outcome)
+                VALUES (%s, 0, 'LOSS')
+            """
+            cursor.execute(sql_create_payout, (bet_id,))
+            
             conn.commit()
 
             cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (wallet_id,))
@@ -109,7 +155,7 @@ def play_game():
         if conn:
             conn.rollback()
         print(f"Bahis Oynama Hatası: {e}")
-        return jsonify({'message': f'Kritik bir hata oluştu, işlem geri alındı: {e}'}), 500
+        return jsonify({'message': 'Oyun sırasında bir hata oluştu. İşlem geri alındı.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()

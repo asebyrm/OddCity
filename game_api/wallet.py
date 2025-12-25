@@ -37,7 +37,7 @@ def get_my_wallet():
 
     except Error as e:
         print(f"Cüzdan getirme hatası: {e}")
-        return jsonify({'message': f'Bir hata oluştu: {e}'}), 500
+        return jsonify({'message': 'Cüzdan bilgileri alınırken bir hata oluştu.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
@@ -101,7 +101,7 @@ def deposit_to_wallet():
         if conn:
             conn.rollback()
         print(f"Deposit hatası: {e}")
-        return jsonify({'message': f'Bir hata oluştu: {e}'}), 500
+        return jsonify({'message': 'Para yatırma işlemi sırasında bir hata oluştu.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
@@ -182,7 +182,7 @@ def withdraw_from_wallet():
         if conn:
             conn.rollback()
         print(f"Para Çekme hatası: {e}")
-        return jsonify({'message': f'Bir hata oluştu: {e}'}), 500
+        return jsonify({'message': 'Para çekme işlemi sırasında bir hata oluştu.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()

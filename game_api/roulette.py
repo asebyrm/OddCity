@@ -1,13 +1,15 @@
 import random
+import json
 from flask import Blueprint, request, jsonify, session
 from .database import get_db_connection
 from .auth import login_required
+from .rules import get_active_rule_value, get_active_rule_set_id, create_rule_snapshot
 from mysql.connector import Error
 
 roulette_bp = Blueprint('roulette', __name__)
 
-# Roulette Payouts
-PAYOUTS = {
+# Varsayılan Roulette Payouts (rule system'de kural yoksa kullanılır)
+DEFAULT_PAYOUTS = {
     'number': 35,  # Straight up
     'color': 1,    # Red/Black
     'parity': 1    # Odd/Even
@@ -46,7 +48,7 @@ def play_roulette():
     if amount <= 0:
         return jsonify({'message': 'Bahis miktarı 0\'dan büyük olmalıdır!'}), 400
 
-    if bet_type not in PAYOUTS:
+    if bet_type not in DEFAULT_PAYOUTS:
         return jsonify({'message': 'Geçersiz bahis türü!'}), 400
 
     # Validate bet_value based on bet_type
@@ -90,9 +92,27 @@ def play_roulette():
             conn.rollback()
             return jsonify({'message': 'Yetersiz bakiye!'}), 400
 
-        # Deduct bet amount
+        # Aktif rule set ID'sini al
+        rule_set_id = get_active_rule_set_id()
+        
+        # Game kaydı oluştur
+        sql_create_game = """
+            INSERT INTO games (user_id, rule_set_id, game_type, status)
+            VALUES (%s, %s, 'roulette', 'ACTIVE')
+        """
+        cursor.execute(sql_create_game, (user_id, rule_set_id))
+        game_id = cursor.lastrowid
+
+        # Bakiye düş
         cursor.execute("UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s", (amount, wallet_id))
-        cursor.execute("INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'BET')", (user_id, wallet_id, amount))
+        
+        # Bet kaydı oluştur
+        sql_create_bet = """
+            INSERT INTO bets (game_id, user_id, bet_type, bet_value, stake_amount)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql_create_bet, (game_id, user_id, bet_type, str(bet_value), amount))
+        bet_id = cursor.lastrowid
 
         # Play Roulette
         winning_number = random.randint(0, 36)
@@ -107,14 +127,49 @@ def play_roulette():
         elif bet_type == 'parity':
             is_win = (bet_value == winning_parity)
 
+        # Rule snapshot oluştur (oyun oynandığında kullanılan rule değerlerini kaydet)
+        create_rule_snapshot(game_id, rule_set_id, 'roulette')
+        
+        # Game sonucunu kaydet
+        game_result_json = json.dumps({
+            'winning_number': winning_number,
+            'winning_color': winning_color,
+            'winning_parity': winning_parity,
+            'bet_type': bet_type,
+            'bet_value': str(bet_value),
+            'is_win': is_win
+        })
+        sql_update_game = """
+            UPDATE games 
+            SET game_result = %s, ended_at = NOW(), status = 'COMPLETED'
+            WHERE game_id = %s
+        """
+        cursor.execute(sql_update_game, (game_result_json, game_id))
+        
         payout = 0
         if is_win:
-            multiplier = PAYOUTS[bet_type]
+            # Database'den payout multiplier'ı al
+            rule_key = f'roulette_{bet_type}_payout'
+            multiplier = get_active_rule_value(rule_key, DEFAULT_PAYOUTS[bet_type])
             # Original stake + profit
             payout = amount * (1 + multiplier)
             
+            # Bakiye ekle
             cursor.execute("UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s", (payout, wallet_id))
-            cursor.execute("INSERT INTO transactions (user_id, wallet_id, amount, tx_type) VALUES (%s, %s, %s, 'PAYOUT')", (user_id, wallet_id, payout))
+            
+            # Payout kaydı oluştur
+            sql_create_payout = """
+                INSERT INTO payouts (bet_id, win_amount, outcome)
+                VALUES (%s, %s, 'WIN')
+            """
+            cursor.execute(sql_create_payout, (bet_id, payout))
+        else:
+            # Kayıp durumunda payout kaydı oluştur
+            sql_create_payout = """
+                INSERT INTO payouts (bet_id, win_amount, outcome)
+                VALUES (%s, 0, 'LOSS')
+            """
+            cursor.execute(sql_create_payout, (bet_id,))
 
         conn.commit()
 
