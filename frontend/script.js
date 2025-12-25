@@ -477,20 +477,33 @@ class GameManager {
     // ========================================
 
     initRoulette() {
-        this.rouletteWheel = document.getElementById('rouletteWheel');
+        this.rouletteStrip = document.getElementById('rouletteStrip');
         this.rouletteBetAmount = document.getElementById('rouletteBetAmount');
         this.roulettePlayBtn = document.getElementById('roulettePlayBtn');
         this.rouletteResult = document.getElementById('rouletteResult');
         this.selectedBet = document.getElementById('selectedBet');
+        this.stripResultDisplay = document.getElementById('stripResultDisplay');
+        this.stripResultNum = document.getElementById('stripResultNum');
+        this.stripResultColor = document.getElementById('stripResultColor');
         this.rouletteBet = null;
+
+        // Rulet sırası (Avrupa ruleti)
+        this.rouletteSequence = [
+            0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10,
+            5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
+        ];
+        
+        this.redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+        
+        // Şeridi oluştur (5 tekrar - sonsuz döngü hissi için)
+        this.buildRouletteStrip();
 
         // Generate number buttons
         const numbersContainer = document.querySelector('#rouletteGame .bet-row.numbers');
-        const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
         
         for (let i = 1; i <= 36; i++) {
             const btn = document.createElement('button');
-            btn.className = `bet-option ${redNumbers.includes(i) ? 'red' : 'black'}`;
+            btn.className = `bet-option ${this.redNumbers.includes(i) ? 'red' : 'black'}`;
             btn.dataset.type = 'number';
             btn.dataset.value = i;
             btn.textContent = i;
@@ -536,6 +549,38 @@ class GameManager {
         this.roulettePlayBtn.addEventListener('click', () => this.playRoulette());
     }
 
+    buildRouletteStrip() {
+        this.rouletteStrip.innerHTML = '';
+        
+        // 10 tekrar oluştur (sonsuz döngü hissi için)
+        this.stripRepeatCount = 10;
+        for (let repeat = 0; repeat < this.stripRepeatCount; repeat++) {
+            this.rouletteSequence.forEach(num => {
+                const numberEl = document.createElement('div');
+                let colorClass = 'green';
+                if (num !== 0) {
+                    colorClass = this.redNumbers.includes(num) ? 'red' : 'black';
+                }
+                numberEl.className = `strip-number ${colorClass}`;
+                numberEl.textContent = num;
+                numberEl.dataset.number = num;
+                this.rouletteStrip.appendChild(numberEl);
+            });
+        }
+        
+        // Başlangıç pozisyonu
+        this.stripNumberWidth = 60;
+        this.stripResetPosition();
+    }
+
+    stripResetPosition() {
+        // Şeridi sıfırla - 2. tekrarın başına getir (böylece sola ve sağa yer var)
+        const startRepeat = 2;
+        const startPosition = startRepeat * this.rouletteSequence.length * this.stripNumberWidth;
+        this.rouletteStrip.style.transition = 'none';
+        this.rouletteStrip.style.transform = `translateX(-${startPosition}px)`;
+    }
+
     async playRoulette() {
         if (!this.rouletteBet) return;
 
@@ -552,6 +597,17 @@ class GameManager {
 
         this.roulettePlayBtn.disabled = true;
         this.rouletteResult.classList.add('hidden');
+        this.stripResultDisplay.classList.add('hidden');
+        
+        // Önceki kazanan işaretini temizle
+        this.rouletteStrip.querySelectorAll('.winning').forEach(el => el.classList.remove('winning'));
+        
+        // Şeridi sıfırla ve animasyon için hazırla
+        this.rouletteStrip.style.transition = 'none';
+        this.stripResetPosition();
+        
+        // Bir frame bekle ki browser yeni pozisyonu render etsin
+        await new Promise(resolve => requestAnimationFrame(resolve));
 
         try {
             const response = await fetch(`${this.apiUrl}/game/roulette/play`, {
@@ -568,20 +624,18 @@ class GameManager {
             const data = await response.json();
 
             if (response.ok) {
-                // Spin wheel animation
-                const rotations = 5 + Math.random() * 3;
-                const resultAngle = (data.result / 37) * 360;
-                const totalAngle = rotations * 360 + resultAngle;
+                // Backend field mapping
+                const result = data.winning_number;
+                const isWin = data.is_win;
+                const color = data.winning_color;
                 
-                this.rouletteWheel.style.transform = `rotate(${totalAngle}deg)`;
-
-                // Show result after animation
-                setTimeout(() => {
-                    this.showRouletteResult(data);
+                // Şerit animasyonu
+                this.animateRouletteStrip(result, () => {
+                    this.showRouletteResult(result, color, isWin, data.payout, data.message);
                     this.balance = data.new_balance;
                     this.updateBalanceDisplay();
-                    this.addToHistory(data.result, data.won);
-                }, 4000);
+                    this.addToHistory(result, isWin);
+                });
             } else {
                 this.showNotification(data.message || 'Oyun hatası!', 'error');
                 this.roulettePlayBtn.disabled = false;
@@ -593,15 +647,87 @@ class GameManager {
         }
     }
 
-    showRouletteResult(data) {
-        this.rouletteResult.classList.remove('hidden', 'win', 'lose');
-        this.rouletteResult.classList.add(data.won ? 'win' : 'lose');
+    animateRouletteStrip(resultNumber, callback) {
+        // Sonuç gösterimini gizle
+        this.stripResultDisplay.classList.add('hidden');
         
-        const colorClass = data.result === 0 ? 'green' : (data.color === 'red' ? 'red' : 'black');
-        this.rouletteResult.querySelector('.result-number').textContent = data.result;
+        // Sonuç sayısının şeritteki indeksini bul
+        const resultIndex = this.rouletteSequence.indexOf(resultNumber);
+        
+        if (resultIndex === -1) {
+            console.error('Sonuç sayısı şeritte bulunamadı:', resultNumber);
+            callback();
+            return;
+        }
+        
+        // 3-5 tam tur + sonuç pozisyonuna git
+        const fullRotations = 3 + Math.floor(Math.random() * 3); // 3-5 tur
+        const numbersToTravel = fullRotations * this.rouletteSequence.length + resultIndex;
+        
+        // Her sayı 60px genişliğinde
+        const travelDistance = numbersToTravel * this.stripNumberWidth;
+        
+        // 2. tekrardan başlıyoruz
+        const startRepeat = 2;
+        const startPosition = startRepeat * this.rouletteSequence.length * this.stripNumberWidth;
+        const finalPosition = startPosition + travelDistance;
+        
+        // Animasyonu başlat
+        this.rouletteStrip.style.transition = 'transform 4s cubic-bezier(0.15, 0.85, 0.35, 1)';
+        this.rouletteStrip.style.transform = `translateX(-${finalPosition}px)`;
+        
+        // Animasyon bitince
+        setTimeout(() => {
+            // Kazanan sayıyı işaretle
+            const allNumbers = this.rouletteStrip.querySelectorAll('.strip-number');
+            allNumbers.forEach(el => {
+                if (parseInt(el.dataset.number) === resultNumber) {
+                    el.classList.add('winning');
+                }
+            });
+            
+            // Sonuç gösterimini güncelle ve göster
+            this.showStripResult(resultNumber);
+            
+            callback();
+            
+            // Bir süre sonra şeridi sıfırla
+            setTimeout(() => {
+                this.rouletteStrip.style.transition = 'none';
+                this.stripResetPosition();
+                // Bir frame sonra transition'ı geri aç
+                requestAnimationFrame(() => {
+                    this.rouletteStrip.style.transition = '';
+                });
+            }, 3000);
+        }, 4000);
+    }
+
+    showStripResult(number) {
+        const colorName = number === 0 ? 'Yeşil' : (this.redNumbers.includes(number) ? 'Kırmızı' : 'Siyah');
+        const colorClass = number === 0 ? 'green' : (this.redNumbers.includes(number) ? 'red' : 'black');
+        
+        this.stripResultNum.textContent = number;
+        this.stripResultNum.className = `result-num ${colorClass}`;
+        this.stripResultColor.textContent = colorName;
+        this.stripResultDisplay.classList.remove('hidden');
+    }
+
+    showRouletteResult(result, color, isWin, payout, message) {
+        this.rouletteResult.classList.remove('hidden', 'win', 'lose');
+        this.rouletteResult.classList.add(isWin ? 'win' : 'lose');
+        
+        const colorClass = result === 0 ? 'green' : (color === 'red' ? 'red' : 'black');
+        this.rouletteResult.querySelector('.result-number').textContent = result;
         this.rouletteResult.querySelector('.result-number').className = `result-number ${colorClass}`;
-        this.rouletteResult.querySelector('.result-text').textContent = data.won ? 'KAZANDINIZ!' : 'KAYBETTİNİZ';
-        this.rouletteResult.querySelector('.result-amount').textContent = data.message;
+        this.rouletteResult.querySelector('.result-text').textContent = isWin ? 'KAZANDINIZ!' : 'KAYBETTİNİZ';
+        
+        // Kazanç miktarını göster
+        if (isWin && payout > 0) {
+            this.rouletteResult.querySelector('.result-amount').textContent = `+${payout.toFixed(2)} ₿`;
+        } else {
+            this.rouletteResult.querySelector('.result-amount').textContent = message;
+        }
         
         // Reset for next game
         setTimeout(() => {

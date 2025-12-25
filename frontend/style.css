@@ -645,83 +645,170 @@ body {
 }
 
 /* ============================================
-   Roulette
+   Roulette Strip
    ============================================ */
 
-.roulette-wheel-container {
+.roulette-strip-container {
     position: relative;
-    width: 280px;
-    height: 280px;
+    width: 100%;
+    max-width: 400px;
+    height: 100px;
+    overflow: visible;
 }
 
-.wheel-pointer {
+.strip-pointer {
     position: absolute;
-    top: -15px;
+    top: -18px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 2rem;
     color: var(--accent-gold);
-    z-index: 10;
-    text-shadow: 0 2px 10px rgba(255, 215, 0, 0.5);
+    z-index: 20;
+    text-shadow: 0 2px 15px rgba(255, 215, 0, 0.8);
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.6));
 }
 
-.roulette-wheel {
+.roulette-strip-viewport {
+    position: relative;
     width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: conic-gradient(
-        #2ecc71 0deg 9.73deg,
-        #e74c3c 9.73deg 19.46deg,
-        #333 19.46deg 29.19deg,
-        #e74c3c 29.19deg 38.92deg,
-        #333 38.92deg 48.65deg,
-        #e74c3c 48.65deg 58.38deg,
-        #333 58.38deg 68.11deg,
-        #e74c3c 68.11deg 77.84deg,
-        #333 77.84deg 87.57deg,
-        #e74c3c 87.57deg 97.3deg,
-        #333 97.3deg 107.03deg,
-        #e74c3c 107.03deg 116.76deg,
-        #333 116.76deg 126.49deg,
-        #e74c3c 126.49deg 136.22deg,
-        #333 136.22deg 145.95deg,
-        #e74c3c 145.95deg 155.68deg,
-        #333 155.68deg 165.41deg,
-        #e74c3c 165.41deg 175.14deg,
-        #333 175.14deg 184.87deg,
-        #e74c3c 184.87deg 194.6deg,
-        #333 194.6deg 204.33deg,
-        #e74c3c 204.33deg 214.06deg,
-        #333 214.06deg 223.79deg,
-        #e74c3c 223.79deg 233.52deg,
-        #333 233.52deg 243.25deg,
-        #e74c3c 243.25deg 252.98deg,
-        #333 252.98deg 262.71deg,
-        #e74c3c 262.71deg 272.44deg,
-        #333 272.44deg 282.17deg,
-        #e74c3c 282.17deg 291.9deg,
-        #333 291.9deg 301.63deg,
-        #e74c3c 301.63deg 311.36deg,
-        #333 311.36deg 321.09deg,
-        #e74c3c 321.09deg 330.82deg,
-        #333 330.82deg 340.55deg,
-        #e74c3c 340.55deg 350.28deg,
-        #333 350.28deg 360deg
-    );
-    border: 8px solid #2c2c4a;
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0, 0, 0, 0.3);
-    transition: transform 4s cubic-bezier(0.2, 0.8, 0.3, 1);
+    height: 80px;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 3px solid var(--border);
+    background: var(--bg-secondary);
+    box-shadow: 
+        0 0 30px rgba(0, 0, 0, 0.5),
+        inset 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
-.wheel-inner {
+.roulette-strip {
+    display: flex;
     position: absolute;
-    top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    top: 0;
+    height: 100%;
+    will-change: transform;
+}
+
+.strip-number {
+    flex-shrink: 0;
     width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #3a3a5a, #2a2a4a);
-    border-radius: 50%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    border-right: 2px solid rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+.strip-number::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        180deg, 
+        rgba(255, 255, 255, 0.15) 0%, 
+        transparent 50%, 
+        rgba(0, 0, 0, 0.2) 100%
+    );
+    pointer-events: none;
+}
+
+.strip-number.red {
+    background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);
+}
+
+.strip-number.black {
+    background: linear-gradient(180deg, #2c2c2c 0%, #1a1a1a 100%);
+}
+
+.strip-number.green {
+    background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
+}
+
+.strip-glow-left,
+.strip-glow-right {
+    position: absolute;
+    top: 0;
+    width: 80px;
+    height: 80px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.strip-glow-left {
+    left: 0;
+    background: linear-gradient(90deg, var(--bg-card) 0%, transparent 100%);
+}
+
+.strip-glow-right {
+    right: 0;
+    background: linear-gradient(-90deg, var(--bg-card) 0%, transparent 100%);
+}
+
+/* Strip Result Display */
+.strip-result-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding: 12px 25px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.strip-result-display.hidden {
+    display: none;
+}
+
+.strip-result-display .result-num {
+    font-size: 2rem;
+    min-width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: #fff;
+}
+
+.strip-result-display .result-num.red {
+    background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);
+}
+
+.strip-result-display .result-num.black {
+    background: linear-gradient(180deg, #2c2c2c 0%, #1a1a1a 100%);
+}
+
+.strip-result-display .result-num.green {
+    background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
+}
+
+.strip-result-display .result-color {
+    color: var(--text-secondary);
+}
+
+/* Winning number highlight */
+.strip-number.winning {
+    animation: winningPulse 0.5s ease-in-out 3;
+    box-shadow: 0 0 30px var(--accent-gold);
+    border: 3px solid var(--accent-gold);
+}
+
+@keyframes winningPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
     border: 4px solid #4a4a6a;
 }
 

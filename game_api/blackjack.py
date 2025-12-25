@@ -192,6 +192,8 @@ def hit():
         return jsonify({
             'player_hand': player_hand,
             'player_value': player_value,
+            'dealer_hand': game['dealer_hand'],
+            'dealer_value': calculate_hand_value(game['dealer_hand']),
             'status': 'bust',
             'message': 'Bust! Kaybettiniz.'
         })
@@ -200,6 +202,8 @@ def hit():
     return jsonify({
         'player_hand': player_hand,
         'player_value': player_value,
+        'dealer_hand': game['dealer_hand'],  # Frontend ikinci kartı gizleyecek
+        'dealer_value': '?',
         'status': 'playing'
     })
 

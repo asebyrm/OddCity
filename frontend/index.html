@@ -130,11 +130,19 @@
             <!-- ROULETTE GAME -->
             <section class="game-section hidden" id="rouletteGame">
                 <div class="game-visual">
-                    <div class="roulette-wheel-container">
-                        <div class="wheel-pointer">▼</div>
-                        <div class="roulette-wheel" id="rouletteWheel">
-                            <div class="wheel-inner"></div>
+                    <div class="roulette-strip-container">
+                        <div class="strip-result-display hidden" id="stripResultDisplay">
+                            <span class="result-num" id="stripResultNum">0</span>
+                            <span class="result-color" id="stripResultColor">Yeşil</span>
                         </div>
+                        <div class="strip-pointer">▼</div>
+                        <div class="roulette-strip-viewport">
+                            <div class="roulette-strip" id="rouletteStrip">
+                                <!-- Sayılar JS tarafından oluşturulacak -->
+                            </div>
+                        </div>
+                        <div class="strip-glow-left"></div>
+                        <div class="strip-glow-right"></div>
                     </div>
                     <div id="rouletteResult" class="result-display hidden">
                         <div class="result-number"></div>
