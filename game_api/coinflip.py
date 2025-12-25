@@ -6,16 +6,16 @@ from .auth import login_required
 from .rules import get_active_rule_value, get_active_rule_set_id, create_rule_snapshot
 from mysql.connector import Error
 
-game_bp = Blueprint('game', __name__)
+coinflip_bp = Blueprint('coinflip', __name__)
 
 # Varsayılan payout multiplier (rule system'de kural yoksa kullanılır)
 DEFAULT_PAYOUT_MULTIPLIER = 1.95
 
-@game_bp.route('/game/play', methods=['POST'])
+@coinflip_bp.route('/game/coinflip/play', methods=['POST'])
 @login_required
-def play_game():
+def play_coinflip():
+    """Yazı-Tura oyunu"""
     user_id = session.get('user_id')
-    user_email = session.get('email')
     data = request.get_json()
 
     if not data or 'amount' not in data or 'choice' not in data:
@@ -128,6 +128,8 @@ def play_game():
                 'message': f'Tebrikler, KAZANDINIZ! ({payout_amount:.2f})',
                 'your_choice': choice,
                 'result': game_result,
+                'is_win': True,
+                'payout': payout_amount,
                 'new_balance': float(new_balance)
             }), 200
 
@@ -148,14 +150,25 @@ def play_game():
                 'message': 'Kaybettiniz.',
                 'your_choice': choice,
                 'result': game_result,
+                'is_win': False,
+                'payout': 0,
                 'new_balance': float(new_balance)
             }), 200
 
     except Error as e:
         if conn:
             conn.rollback()
-        print(f"Bahis Oynama Hatası: {e}")
+        print(f"Coinflip Hatasi: {e}")
         return jsonify({'message': 'Oyun sırasında bir hata oluştu. İşlem geri alındı.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+
+
+# Eski endpoint'i koruyalım (geriye dönük uyumluluk için)
+@coinflip_bp.route('/game/play', methods=['POST'])
+@login_required
+def play_game_legacy():
+    """Eski endpoint - geriye dönük uyumluluk için"""
+    return play_coinflip()
+
