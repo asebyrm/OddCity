@@ -103,12 +103,31 @@ def login_user():
             wallet = cursor.fetchone()
             balance = float(wallet['balance']) if wallet else 0.0
             
-            return jsonify({
-                'message': 'Giriş başarılı! Sunucu sizi hatırlayacak.',
+            # Check for active blackjack game
+            cursor.execute("""
+                SELECT game_id, game_state, started_at 
+                FROM games 
+                WHERE user_id = %s AND game_type = 'blackjack' AND status = 'ACTIVE'
+                ORDER BY started_at DESC LIMIT 1
+            """, (user['user_id'],))
+            active_game = cursor.fetchone()
+            
+            response_data = {
+                'message': 'Giris basarili!',
                 'email': user['email'],
                 'is_admin': bool(user['is_admin']),
                 'balance': balance
-            }), 200
+            }
+            
+            if active_game and active_game.get('game_state'):
+                response_data['has_active_game'] = True
+                response_data['active_game'] = {
+                    'game_id': active_game['game_id'],
+                    'game_type': 'blackjack',
+                    'started_at': active_game['started_at'].isoformat() if active_game['started_at'] else None
+                }
+            
+            return jsonify(response_data), 200
         else:
             return jsonify({'message': 'Geçersiz e-posta veya şifre!'}), 401
     except Error as e:

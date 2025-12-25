@@ -241,7 +241,79 @@ class GameManager {
         }
         
         this.enableGameControls();
+        
+        // Aktif oyun kontrolü
+        if (user.has_active_game && user.active_game) {
+            this.showActiveGamePrompt(user.active_game);
+        }
     }
+
+    showActiveGamePrompt(activeGame) {
+        const gameNames = {
+            'blackjack': 'Blackjack',
+            'roulette': 'Rulet',
+            'coinflip': 'Yazı Tura'
+        };
+        
+        const gameName = gameNames[activeGame.game_type] || activeGame.game_type;
+        
+        // Modal oluştur
+        const modal = document.createElement('div');
+        modal.className = 'modal active-game-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>Yarım Kalan Oyun</h3>
+                <p>Tamamlanmamış bir <strong>${gameName}</strong> oyununuz var.</p>
+                <p class="text-muted">Oyununuzu tamamlamanız gerekmektedir.</p>
+                <div class="modal-buttons">
+                    <button class="btn btn-primary" id="resumeGameBtn">Devam Et</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        document.getElementById('resumeGameBtn').addEventListener('click', async () => {
+            await this.resumeActiveGame(activeGame.game_type);
+            modal.remove();
+        });
+    }
+
+    async resumeActiveGame(gameType) {
+        if (gameType === 'blackjack') {
+            try {
+                const response = await fetch(`${this.apiUrl}/game/blackjack/resume`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Blackjack oyununa geç
+                    this.switchGame('blackjack');
+                    
+                    // Oyun durumunu yükle
+                    this.bjGameActive = true;
+                    this.bjBetSection.classList.add('hidden');
+                    this.bjActions.classList.remove('hidden');
+                    this.bjPlayBtn.classList.add('hidden');
+                    
+                    this.renderBlackjackHands(data);
+                    this.balance = data.new_balance;
+                    this.updateBalanceDisplay();
+                    
+                    this.showNotification('Oyuna devam ediliyor!', 'success');
+                } else {
+                    this.showNotification(data.message || 'Oyun yüklenemedi!', 'error');
+                }
+            } catch (error) {
+                console.error('Resume error:', error);
+                this.showNotification('Bağlantı hatası!', 'error');
+            }
+        }
+    }
+
 
     onLogout() {
         this.guestButtons.classList.remove('hidden');

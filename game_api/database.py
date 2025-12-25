@@ -73,10 +73,11 @@ def init_db():
             user_id INTEGER NOT NULL,
             rule_set_id INTEGER,
             game_type VARCHAR(20) NOT NULL CHECK (game_type IN ('coinflip', 'roulette', 'blackjack')),
+            game_state JSON,
             game_result TEXT,
             started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             ended_at TIMESTAMP,
-            status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','COMPLETED')),
+            status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','COMPLETED','ABANDONED')),
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (rule_set_id) REFERENCES rule_sets(rule_set_id)
         );

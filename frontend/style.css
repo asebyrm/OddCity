@@ -1352,3 +1352,94 @@ body {
         margin: 15px;
     }
 }
+
+/* ============================================
+   Active Game Modal
+   ============================================ */
+
+.active-game-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+}
+
+.active-game-modal .modal-content {
+    background: var(--bg-card);
+    border: 2px solid var(--accent);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 400px;
+    text-align: center;
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.active-game-modal h3 {
+    color: var(--accent);
+    margin-bottom: 15px;
+    font-size: 1.5rem;
+}
+
+.active-game-modal p {
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.active-game-modal .text-muted {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.active-game-modal .modal-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px;
+    justify-content: center;
+}
+
+.active-game-modal .btn {
+    padding: 12px 30px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+.active-game-modal .btn-primary {
+    background: var(--accent);
+    color: var(--bg-primary);
+}
+
+.active-game-modal .btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+}
+
+.active-game-modal .btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.active-game-modal .btn-secondary:hover {
+    background: var(--bg-card-hover);
+}

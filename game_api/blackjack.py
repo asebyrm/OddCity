@@ -38,6 +38,200 @@ def calculate_hand_value(hand):
     
     return value
 
+
+def save_game_state(cursor, game_id, deck, player_hand, dealer_hand, bet_amount, wallet_id):
+    """Oyun durumunu veritabanına kaydet"""
+    game_state = json.dumps({
+        'deck': deck,
+        'player_hand': player_hand,
+        'dealer_hand': dealer_hand,
+        'bet_amount': bet_amount,
+        'wallet_id': wallet_id
+    })
+    cursor.execute("UPDATE games SET game_state = %s WHERE game_id = %s", (game_state, game_id))
+
+
+def load_game_state(game_row):
+    """Veritabanından oyun durumunu yükle"""
+    if not game_row or not game_row.get('game_state'):
+        return None
+    
+    try:
+        state = json.loads(game_row['game_state']) if isinstance(game_row['game_state'], str) else game_row['game_state']
+        return {
+            'game_id': game_row['game_id'],
+            'bet_id': game_row.get('bet_id'),
+            'deck': state['deck'],
+            'player_hand': state['player_hand'],
+            'dealer_hand': state['dealer_hand'],
+            'bet_amount': state['bet_amount'],
+            'wallet_id': state['wallet_id'],
+            'status': 'playing'
+        }
+    except (json.JSONDecodeError, KeyError):
+        return None
+
+
+def get_active_blackjack_game(cursor, user_id):
+    """Kullanıcının aktif blackjack oyununu getir"""
+    cursor.execute("""
+        SELECT g.*, b.bet_id 
+        FROM games g
+        LEFT JOIN bets b ON g.game_id = b.game_id
+        WHERE g.user_id = %s AND g.game_type = 'blackjack' AND g.status = 'ACTIVE'
+        ORDER BY g.started_at DESC
+        LIMIT 1
+    """, (user_id,))
+    return cursor.fetchone()
+
+
+@blackjack_bp.route('/game/blackjack/active', methods=['GET'])
+@login_required
+def check_active_game():
+    """Aktif blackjack oyunu var mı kontrol et"""
+    user_id = session.get('user_id')
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Veritabani hatasi'}), 500
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        game_row = get_active_blackjack_game(cursor, user_id)
+        
+        if game_row:
+            game_state = load_game_state(game_row)
+            if game_state:
+                player_value = calculate_hand_value(game_state['player_hand'])
+                return jsonify({
+                    'has_active_game': True,
+                    'game_id': game_row['game_id'],
+                    'bet_amount': game_state['bet_amount'],
+                    'player_hand': game_state['player_hand'],
+                    'dealer_card': game_state['dealer_hand'][0],
+                    'player_value': player_value,
+                    'started_at': game_row['started_at'].isoformat() if game_row['started_at'] else None
+                })
+        
+        return jsonify({'has_active_game': False})
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@blackjack_bp.route('/game/blackjack/resume', methods=['POST'])
+@login_required
+def resume_game():
+    """Aktif oyunu devam ettir"""
+    user_id = session.get('user_id')
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Veritabani hatasi'}), 500
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        game_row = get_active_blackjack_game(cursor, user_id)
+        
+        if not game_row:
+            return jsonify({'message': 'Aktif oyun bulunamadi!'}), 404
+        
+        game_state = load_game_state(game_row)
+        if not game_state:
+            return jsonify({'message': 'Oyun durumu yuklenemedi!'}), 500
+        
+        # Session'a yükle
+        game_state['bet_id'] = game_row['bet_id']
+        session['bj_game'] = game_state
+        
+        player_value = calculate_hand_value(game_state['player_hand'])
+        
+        # Bakiye bilgisini al
+        cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (game_state['wallet_id'],))
+        wallet = cursor.fetchone()
+        
+        return jsonify({
+            'message': 'Oyun devam ediyor',
+            'player_hand': game_state['player_hand'],
+            'dealer_card': game_state['dealer_hand'][0],
+            'player_value': player_value,
+            'status': 'playing',
+            'new_balance': float(wallet['balance']) if wallet else 0
+        })
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@blackjack_bp.route('/game/blackjack/abandon', methods=['POST'])
+@login_required
+def abandon_game():
+    """Aktif oyunu iptal et ve bahisi geri ver"""
+    user_id = session.get('user_id')
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Veritabani hatasi'}), 500
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        conn.start_transaction()
+        
+        game_row = get_active_blackjack_game(cursor, user_id)
+        
+        if not game_row:
+            conn.rollback()
+            return jsonify({'message': 'Aktif oyun bulunamadi!'}), 404
+        
+        game_state = load_game_state(game_row)
+        if not game_state:
+            conn.rollback()
+            return jsonify({'message': 'Oyun durumu yuklenemedi!'}), 500
+        
+        # Bahisi geri ver
+        cursor.execute(
+            "UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s",
+            (game_state['bet_amount'], game_state['wallet_id'])
+        )
+        
+        # Oyunu ABANDONED olarak işaretle
+        cursor.execute(
+            "UPDATE games SET status = 'ABANDONED', ended_at = NOW() WHERE game_id = %s",
+            (game_row['game_id'],)
+        )
+        
+        # Payout kaydı (refund)
+        if game_row.get('bet_id'):
+            cursor.execute("""
+                INSERT INTO payouts (bet_id, win_amount, outcome)
+                VALUES (%s, %s, 'LOSS')
+            """, (game_row['bet_id'], 0))
+        
+        conn.commit()
+        
+        # Session'dan temizle
+        session.pop('bj_game', None)
+        
+        # Yeni bakiyeyi al
+        cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (game_state['wallet_id'],))
+        wallet = cursor.fetchone()
+        
+        return jsonify({
+            'message': 'Oyun iptal edildi, bahis iade edildi',
+            'refund_amount': game_state['bet_amount'],
+            'new_balance': float(wallet['balance']) if wallet else 0
+        })
+        
+    except Error as e:
+        conn.rollback()
+        return jsonify({'message': f'Hata: {e}'}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @blackjack_bp.route('/game/blackjack/start', methods=['POST'])
 @login_required
 def start_game():
@@ -45,22 +239,32 @@ def start_game():
     data = request.get_json()
     
     if not data or 'amount' not in data:
-        return jsonify({'message': 'Bahis miktarı gereklidir!'}), 400
+        return jsonify({'message': 'Bahis miktari gereklidir!'}), 400
         
     try:
         amount = float(data['amount'])
         if amount <= 0: raise ValueError
     except ValueError:
-        return jsonify({'message': 'Geçersiz bahis miktarı!'}), 400
+        return jsonify({'message': 'Gecersiz bahis miktari!'}), 400
 
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
-        if conn is None: return jsonify({'message': 'Veritabanı hatası!'}), 500
+        if conn is None: return jsonify({'message': 'Veritabani hatasi!'}), 500
         
         conn.start_transaction()
         cursor = conn.cursor(dictionary=True)
+        
+        # Aktif oyun kontrolü
+        active_game = get_active_blackjack_game(cursor, user_id)
+        if active_game:
+            conn.rollback()
+            return jsonify({
+                'message': 'Zaten aktif bir oyununuz var!',
+                'has_active_game': True,
+                'game_id': active_game['game_id']
+            }), 400
         
         # Check balance
         cursor.execute("SELECT wallet_id, balance FROM wallets WHERE user_id = %s FOR UPDATE", (user_id,))
@@ -94,15 +298,19 @@ def start_game():
         cursor.execute(sql_create_bet, (game_id, user_id, 'blackjack', str(amount), amount))
         bet_id = cursor.lastrowid
         
-        conn.commit()
-        
         # Initialize Game State
         deck = get_deck()
         random.shuffle(deck)
         
         player_hand = [deck.pop(), deck.pop()]
-        dealer_hand = [deck.pop(), deck.pop()] # Second card hidden in frontend
+        dealer_hand = [deck.pop(), deck.pop()]
         
+        # Oyun durumunu veritabanına kaydet
+        save_game_state(cursor, game_id, deck, player_hand, dealer_hand, amount, wallet_id)
+        
+        conn.commit()
+        
+        # Session'a da kaydet (performans için)
         session['bj_game'] = {
             'game_id': game_id,
             'bet_id': bet_id,
@@ -118,11 +326,11 @@ def start_game():
         
         # Check for immediate Blackjack
         if player_value == 21:
-            return stand_logic(conn, cursor, game_id, bet_id, wallet_id, amount, player_hand, dealer_hand, True)
+            return handle_game_end(game_id, bet_id, wallet_id, amount, player_hand, dealer_hand, True)
             
         return jsonify({
             'player_hand': player_hand,
-            'dealer_card': dealer_hand[0], # Show only first card
+            'dealer_card': dealer_hand[0],
             'player_value': player_value,
             'status': 'playing',
             'new_balance': float(wallet['balance']) - amount
@@ -135,11 +343,29 @@ def start_game():
         if cursor: cursor.close()
         if conn: conn.close()
 
+
 @blackjack_bp.route('/game/blackjack/hit', methods=['POST'])
 @login_required
 def hit():
+    user_id = session.get('user_id')
     game = session.get('bj_game')
-    if not game or game['status'] != 'playing':
+    
+    # Session'da oyun yoksa veritabanından yükle
+    if not game or game.get('status') != 'playing':
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        game_row = get_active_blackjack_game(cursor, user_id)
+        
+        if game_row:
+            game = load_game_state(game_row)
+            if game:
+                game['bet_id'] = game_row['bet_id']
+                session['bj_game'] = game
+        
+        cursor.close()
+        conn.close()
+    
+    if not game or game.get('status') != 'playing':
         return jsonify({'message': 'Aktif oyun yok!'}), 400
         
     deck = game['deck']
@@ -151,43 +377,44 @@ def hit():
     
     player_value = calculate_hand_value(player_hand)
     
+    # Oyun durumunu güncelle
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    save_game_state(cursor, game['game_id'], deck, player_hand, game['dealer_hand'], game['bet_amount'], game['wallet_id'])
+    conn.commit()
+    
     if player_value > 21:
         # Bust durumunda oyunu bitir
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        
         game_id = game['game_id']
         bet_id = game['bet_id']
         
-        # Rule snapshot oluştur (oyun oynandığında kullanılan rule değerlerini kaydet)
+        # Rule snapshot oluştur
         create_rule_snapshot(game_id, get_active_rule_set_id(), 'blackjack')
         
         # Game sonucunu kaydet
         game_result_json = json.dumps({
             'player_hand': player_hand,
+            'dealer_hand': game['dealer_hand'],
             'player_value': player_value,
             'result': 'bust',
             'payout': 0
         })
-        sql_update_game = """
+        cursor.execute("""
             UPDATE games 
-            SET game_result = %s, ended_at = NOW(), status = 'COMPLETED'
+            SET game_result = %s, game_state = NULL, ended_at = NOW(), status = 'COMPLETED'
             WHERE game_id = %s
-        """
-        cursor.execute(sql_update_game, (game_result_json, game_id))
+        """, (game_result_json, game_id))
         
         # Payout kaydı oluştur (LOSS)
-        sql_create_payout = """
+        cursor.execute("""
             INSERT INTO payouts (bet_id, win_amount, outcome)
             VALUES (%s, 0, 'LOSS')
-        """
-        cursor.execute(sql_create_payout, (bet_id,))
+        """, (bet_id,))
         
         conn.commit()
         cursor.close()
         conn.close()
         
-        game['status'] = 'finished'
         session.pop('bj_game', None)
         return jsonify({
             'player_hand': player_hand,
@@ -197,123 +424,170 @@ def hit():
             'status': 'bust',
             'message': 'Bust! Kaybettiniz.'
         })
-        
+    
+    # Session'ı güncelle
     session['bj_game'] = game
-    return jsonify({
-        'player_hand': player_hand,
-        'player_value': player_value,
-        'dealer_hand': game['dealer_hand'],  # Frontend ikinci kartı gizleyecek
-        'dealer_value': '?',
-        'status': 'playing'
-    })
-
-@blackjack_bp.route('/game/blackjack/stand', methods=['POST'])
-@login_required
-def stand():
-    game = session.get('bj_game')
-    if not game or game['status'] != 'playing':
-        return jsonify({'message': 'Aktif oyun yok!'}), 400
-        
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    
-    return stand_logic(conn, cursor, game['game_id'], game['bet_id'], game['wallet_id'], game['bet_amount'], game['player_hand'], game['dealer_hand'])
-
-def stand_logic(conn, cursor, game_id, bet_id, wallet_id, amount, player_hand, dealer_hand, is_blackjack=False):
-    user_id = session.get('user_id')
-    deck = session['bj_game']['deck']
-    dealer_value = calculate_hand_value(dealer_hand)
-    
-    # Dealer plays
-    while dealer_value < 17:
-        card = deck.pop()
-        dealer_hand.append(card)
-        dealer_value = calculate_hand_value(dealer_hand)
-        
-    player_value = calculate_hand_value(player_hand)
-    
-    payout = 0
-    result = 'lose'
-    message = 'Kaybettiniz.'
-    
-    # Database'den payout multiplier'ları al
-    blackjack_multiplier = get_active_rule_value('blackjack_payout', DEFAULT_BLACKJACK_PAYOUT)
-    normal_multiplier = get_active_rule_value('blackjack_normal_payout', DEFAULT_NORMAL_PAYOUT)
-    
-    if is_blackjack:
-        # Check if dealer also has blackjack
-        if dealer_value == 21 and len(dealer_hand) == 2:
-            payout = amount # Push
-            result = 'push'
-            message = 'Berabere (Push)!'
-        else:
-            payout = amount * blackjack_multiplier
-            result = 'win'
-            message = 'Blackjack! Kazandınız!'
-    elif dealer_value > 21:
-        payout = amount * normal_multiplier
-        result = 'win'
-        message = 'Krupiye Battı! Kazandınız!'
-    elif dealer_value > player_value:
-        result = 'lose'
-        message = 'Krupiye Kazandı.'
-    elif dealer_value < player_value:
-        payout = amount * normal_multiplier
-        result = 'win'
-        message = 'Kazandınız!'
-    else:
-        payout = amount
-        result = 'push'
-        message = 'Berabere (Push)!'
-        
-    # Rule snapshot oluştur (oyun oynandığında kullanılan rule değerlerini kaydet)
-    create_rule_snapshot(game_id, get_active_rule_set_id(), 'blackjack')
-    
-    # Game sonucunu kaydet
-    game_result_json = json.dumps({
-        'player_hand': player_hand,
-        'dealer_hand': dealer_hand,
-        'player_value': player_value,
-        'dealer_value': dealer_value,
-        'result': result,
-        'payout': payout
-    })
-    sql_update_game = """
-        UPDATE games 
-        SET game_result = %s, ended_at = NOW(), status = 'COMPLETED'
-        WHERE game_id = %s
-    """
-    cursor.execute(sql_update_game, (game_result_json, game_id))
-    
-    # Payout kaydı oluştur
-    # PUSH durumunda outcome = 'LOSS' ama win_amount = payout (stake geri verilir)
-    outcome = 'WIN' if result == 'win' else 'LOSS'
-    sql_create_payout = """
-        INSERT INTO payouts (bet_id, win_amount, outcome)
-        VALUES (%s, %s, %s)
-    """
-    cursor.execute(sql_create_payout, (bet_id, payout, outcome))
-    
-    if payout > 0:
-        cursor.execute("UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s", (payout, wallet_id))
-    
-    conn.commit()
-    
-    cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (wallet_id,))
-    new_balance = float(cursor.fetchone()['balance'])
-    
-    session.pop('bj_game', None)
     cursor.close()
     conn.close()
     
     return jsonify({
         'player_hand': player_hand,
-        'dealer_hand': dealer_hand,
         'player_value': player_value,
-        'dealer_value': dealer_value,
-        'status': 'finished',
-        'result': result,
-        'message': message,
-        'payout': payout,
-        'new_balance': new_balance
+        'dealer_hand': game['dealer_hand'],
+        'dealer_value': '?',
+        'status': 'playing'
     })
+
+
+@blackjack_bp.route('/game/blackjack/stand', methods=['POST'])
+@login_required
+def stand():
+    user_id = session.get('user_id')
+    game = session.get('bj_game')
+    
+    # Session'da oyun yoksa veritabanından yükle
+    if not game or game.get('status') != 'playing':
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        game_row = get_active_blackjack_game(cursor, user_id)
+        
+        if game_row:
+            game = load_game_state(game_row)
+            if game:
+                game['bet_id'] = game_row['bet_id']
+                session['bj_game'] = game
+        
+        cursor.close()
+        conn.close()
+    
+    if not game or game.get('status') != 'playing':
+        return jsonify({'message': 'Aktif oyun yok!'}), 400
+    
+    return handle_game_end(
+        game['game_id'], 
+        game['bet_id'], 
+        game['wallet_id'], 
+        game['bet_amount'], 
+        game['player_hand'], 
+        game['dealer_hand'],
+        False
+    )
+
+
+def handle_game_end(game_id, bet_id, wallet_id, amount, player_hand, dealer_hand, is_blackjack=False):
+    """Oyun bitişini işle"""
+    user_id = session.get('user_id')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        conn.start_transaction()
+        
+        deck = session.get('bj_game', {}).get('deck', get_deck())
+        
+        # Dealer draws
+        while calculate_hand_value(dealer_hand) < 17:
+            if deck:
+                dealer_hand.append(deck.pop())
+            else:
+                break
+        
+        player_value = calculate_hand_value(player_hand)
+        dealer_value = calculate_hand_value(dealer_hand)
+        
+        # Determine winner
+        payout = 0
+        result = ''
+        message = ''
+        
+        if is_blackjack and player_value == 21 and len(player_hand) == 2:
+            # Player has blackjack
+            if dealer_value == 21 and len(dealer_hand) == 2:
+                result = 'push'
+                payout = amount
+                message = 'Her iki taraf da Blackjack! Push.'
+            else:
+                result = 'blackjack'
+                payout_multiplier = get_active_rule_value('blackjack_payout', DEFAULT_BLACKJACK_PAYOUT)
+                payout = amount * payout_multiplier
+                message = f'BLACKJACK! Kazandiniz! (+{payout:.2f})'
+        elif dealer_value > 21:
+            result = 'win'
+            payout_multiplier = get_active_rule_value('blackjack_normal_payout', DEFAULT_NORMAL_PAYOUT)
+            payout = amount * payout_multiplier
+            message = f'Krupiye batti! Kazandiniz! (+{payout:.2f})'
+        elif player_value > dealer_value:
+            result = 'win'
+            payout_multiplier = get_active_rule_value('blackjack_normal_payout', DEFAULT_NORMAL_PAYOUT)
+            payout = amount * payout_multiplier
+            message = f'Kazandiniz! (+{payout:.2f})'
+        elif player_value < dealer_value:
+            result = 'lose'
+            payout = 0
+            message = 'Kaybettiniz.'
+        else:
+            result = 'push'
+            payout = amount
+            message = 'Berabere! Bahis iade edildi.'
+        
+        # Rule snapshot
+        create_rule_snapshot(game_id, get_active_rule_set_id(), 'blackjack')
+        
+        # Update balance if won
+        if payout > 0:
+            cursor.execute(
+                "UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s",
+                (payout, wallet_id)
+            )
+        
+        # Save game result
+        game_result_json = json.dumps({
+            'player_hand': player_hand,
+            'dealer_hand': dealer_hand,
+            'player_value': player_value,
+            'dealer_value': dealer_value,
+            'result': result,
+            'payout': payout
+        })
+        
+        cursor.execute("""
+            UPDATE games 
+            SET game_result = %s, game_state = NULL, ended_at = NOW(), status = 'COMPLETED'
+            WHERE game_id = %s
+        """, (game_result_json, game_id))
+        
+        # Create payout record
+        outcome = 'WIN' if result in ['win', 'blackjack'] else 'LOSS'
+        cursor.execute("""
+            INSERT INTO payouts (bet_id, win_amount, outcome)
+            VALUES (%s, %s, %s)
+        """, (bet_id, payout, outcome))
+        
+        conn.commit()
+        
+        # Get new balance
+        cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s", (wallet_id,))
+        new_balance = float(cursor.fetchone()['balance'])
+        
+        # Clear session
+        session.pop('bj_game', None)
+        
+        return jsonify({
+            'player_hand': player_hand,
+            'dealer_hand': dealer_hand,
+            'player_value': player_value,
+            'dealer_value': dealer_value,
+            'result': result,
+            'status': 'finished',
+            'message': message,
+            'payout': payout,
+            'new_balance': new_balance
+        })
+        
+    except Error as e:
+        conn.rollback()
+        return jsonify({'message': f'Hata: {e}'}), 500
+    finally:
+        cursor.close()
+        conn.close()
