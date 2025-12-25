@@ -302,13 +302,29 @@ class GameService:
             stats = cursor.fetchone()
             
             if stats:
-                total = (stats['win_count'] or 0) + (stats['loss_count'] or 0)
-                stats['win_rate'] = (stats['win_count'] / total * 100) if total > 0 else 0
-                stats['total_bets'] = float(stats['total_bets'])
-                stats['total_payouts'] = float(stats['total_payouts'])
-                stats['profit'] = stats['total_bets'] - stats['total_payouts']
+                win_count = int(stats['win_count'] or 0)
+                loss_count = int(stats['loss_count'] or 0)
+                total = win_count + loss_count
+                
+                return {
+                    'total_games': int(stats['total_games'] or 0),
+                    'total_bets': float(stats['total_bets'] or 0),
+                    'total_payouts': float(stats['total_payouts'] or 0),
+                    'win_count': win_count,
+                    'loss_count': loss_count,
+                    'win_rate': round((win_count / total * 100), 2) if total > 0 else 0,
+                    'profit': float(stats['total_bets'] or 0) - float(stats['total_payouts'] or 0)
+                }
             
-            return stats or {}
+            return {
+                'total_games': 0,
+                'total_bets': 0,
+                'total_payouts': 0,
+                'win_count': 0,
+                'loss_count': 0,
+                'win_rate': 0,
+                'profit': 0
+            }
             
         except Error as e:
             game_logger.error(f"Get game stats error: {e}")

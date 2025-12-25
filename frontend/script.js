@@ -45,8 +45,21 @@ class GameManager {
         this.coinflipGame = document.getElementById('coinflipGame');
         this.rouletteGame = document.getElementById('rouletteGame');
         this.blackjackGame = document.getElementById('blackjackGame');
+        this.profileSection = document.getElementById('profileSection');
         this.historySection = document.getElementById('historySection');
         this.historyList = document.getElementById('historyList');
+        
+        // Profile elements
+        this.profileEmail = document.getElementById('profileEmail');
+        this.profileJoined = document.getElementById('profileJoined');
+        this.statTotalGames = document.getElementById('statTotalGames');
+        this.statWins = document.getElementById('statWins');
+        this.statWinRate = document.getElementById('statWinRate');
+        this.statTotalWagered = document.getElementById('statTotalWagered');
+        this.profileGamesList = document.getElementById('profileGamesList');
+        this.gameTypeFilter = document.getElementById('gameTypeFilter');
+        this.loadMoreGames = document.getElementById('loadMoreGames');
+        this.profileGamesOffset = 0;
         
         // Auth Modal
         this.authModal = document.getElementById('authModal');
@@ -398,6 +411,7 @@ class GameManager {
         this.initCoinFlip();
         this.initRoulette();
         this.initBlackjack();
+        this.initProfile();
     }
 
     switchGame(game) {
@@ -412,14 +426,26 @@ class GameManager {
         const titles = {
             coinflip: 'Coin Flip',
             roulette: 'Roulette',
-            blackjack: 'Blackjack'
+            blackjack: 'Blackjack',
+            profile: 'Profil'
         };
-        this.gameTitle.textContent = titles[game];
+        this.gameTitle.textContent = titles[game] || game;
 
         // Show game section
         this.coinflipGame.classList.toggle('hidden', game !== 'coinflip');
         this.rouletteGame.classList.toggle('hidden', game !== 'roulette');
         this.blackjackGame.classList.toggle('hidden', game !== 'blackjack');
+        this.profileSection.classList.toggle('hidden', game !== 'profile');
+        
+        // Hide history for profile
+        if (this.historySection) {
+            this.historySection.classList.toggle('hidden', game === 'profile' || !this.currentUser);
+        }
+        
+        // Load profile data when switching to profile
+        if (game === 'profile' && this.currentUser) {
+            this.loadProfile();
+        }
     }
 
     enableGameControls() {
@@ -1040,6 +1066,204 @@ class GameManager {
             this.dealerScore.textContent = '?';
             this.playerScore.textContent = '0';
         }, 3000);
+    }
+
+    // ========================================
+    // Profile
+    // ========================================
+
+    initProfile() {
+        // Filter change event
+        if (this.gameTypeFilter) {
+            this.gameTypeFilter.addEventListener('change', () => {
+                this.profileGamesOffset = 0;
+                this.loadProfileGames(true);
+            });
+        }
+        
+        // Load more button
+        if (this.loadMoreGames) {
+            this.loadMoreGames.addEventListener('click', () => {
+                this.loadProfileGames(false);
+            });
+        }
+    }
+
+    async loadProfile() {
+        if (!this.currentUser) return;
+        
+        // Load user info
+        await this.loadProfileInfo();
+        
+        // Load stats
+        await this.loadProfileStats();
+        
+        // Load games
+        this.profileGamesOffset = 0;
+        await this.loadProfileGames(true);
+    }
+
+    async loadProfileInfo() {
+        try {
+            const response = await fetch(`${this.apiUrl}/me`, {
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const user = await response.json();
+                this.profileEmail.textContent = user.email;
+                
+                if (user.created_at) {
+                    const date = new Date(user.created_at);
+                    this.profileJoined.textContent = date.toLocaleDateString('tr-TR');
+                }
+            }
+        } catch (error) {
+            console.error('Profile info error:', error);
+        }
+    }
+
+    async loadProfileStats() {
+        try {
+            const response = await fetch(`${this.apiUrl}/me/stats`, {
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const stats = await response.json();
+                console.log('Stats:', stats); // Debug
+                
+                const totalGames = parseInt(stats.total_games) || 0;
+                const wins = parseInt(stats.win_count) || 0;
+                const totalWagered = parseFloat(stats.total_bets) || 0;
+                const winRate = parseFloat(stats.win_rate) || 0;
+                
+                this.statTotalGames.textContent = totalGames;
+                this.statWins.textContent = wins;
+                this.statWinRate.textContent = `${winRate.toFixed(1)}%`;
+                this.statTotalWagered.textContent = totalWagered.toFixed(2);
+            }
+        } catch (error) {
+            console.error('Profile stats error:', error);
+        }
+    }
+
+    async loadProfileGames(reset = false) {
+        if (reset) {
+            this.profileGamesOffset = 0;
+            this.profileGamesList.innerHTML = '<p class="loading-text">Yükleniyor...</p>';
+        }
+        
+        const gameType = this.gameTypeFilter.value;
+        const limit = 10;
+        
+        try {
+            let url = `${this.apiUrl}/me/games?limit=${limit}&offset=${this.profileGamesOffset}`;
+            if (gameType) {
+                url += `&game_type=${gameType}`;
+            }
+            
+            const response = await fetch(url, {
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const games = await response.json();
+                
+                if (reset) {
+                    this.profileGamesList.innerHTML = '';
+                }
+                
+                if (games.length === 0 && reset) {
+                    this.profileGamesList.innerHTML = '<p class="no-games-text">Henüz oyun geçmişi yok.</p>';
+                    this.loadMoreGames.classList.add('hidden');
+                    return;
+                }
+                
+                games.forEach(game => {
+                    this.profileGamesList.appendChild(this.createGameRow(game));
+                });
+                
+                this.profileGamesOffset += games.length;
+                
+                // Show/hide load more button
+                if (games.length < limit) {
+                    this.loadMoreGames.classList.add('hidden');
+                } else {
+                    this.loadMoreGames.classList.remove('hidden');
+                }
+            }
+        } catch (error) {
+            console.error('Profile games error:', error);
+            this.profileGamesList.innerHTML = '<p class="no-games-text">Oyunlar yüklenirken hata oluştu.</p>';
+        }
+    }
+
+    createGameRow(game) {
+        const row = document.createElement('div');
+        row.className = 'game-row';
+        
+        const icons = {
+            'coinflip': '🪙',
+            'roulette': '🎡',
+            'blackjack': '🃏'
+        };
+        
+        const names = {
+            'coinflip': 'Coin Flip',
+            'roulette': 'Roulette',
+            'blackjack': 'Blackjack'
+        };
+        
+        // Parse game result
+        let resultClass = 'lose';
+        let resultText = '-';
+        let payout = 0;
+        
+        if (game.game_result) {
+            try {
+                const result = typeof game.game_result === 'string' 
+                    ? JSON.parse(game.game_result) 
+                    : game.game_result;
+                
+                if (result.is_win || result.result === 'win' || result.result === 'blackjack') {
+                    resultClass = 'win';
+                    payout = result.payout || 0;
+                    resultText = `+${payout.toFixed(2)}`;
+                } else if (result.result === 'push') {
+                    resultClass = 'push';
+                    resultText = '0.00';
+                } else {
+                    resultText = `-${game.stake_amount?.toFixed(2) || '0.00'}`;
+                }
+            } catch (e) {
+                resultText = game.status === 'COMPLETED' ? '-' : 'Devam ediyor';
+            }
+        }
+        
+        const date = game.started_at ? new Date(game.started_at).toLocaleDateString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : '-';
+        
+        row.innerHTML = `
+            <div class="game-row-left">
+                <span class="game-type-icon">${icons[game.game_type] || '🎮'}</span>
+                <div>
+                    <div class="game-type-name">${names[game.game_type] || game.game_type}</div>
+                    <div class="game-date">${date}</div>
+                </div>
+            </div>
+            <div class="game-row-right">
+                <div class="game-result ${resultClass}">${resultText}</div>
+                <div class="game-stake">Bahis: ${game.stake_amount?.toFixed(2) || '0.00'}</div>
+            </div>
+        `;
+        
+        return row;
     }
 
     // ========================================

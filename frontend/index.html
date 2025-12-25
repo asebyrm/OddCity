@@ -30,6 +30,11 @@
                 <span class="nav-icon">🃏</span>
                 <span class="nav-text">Blackjack</span>
             </a>
+            <div class="nav-divider"></div>
+            <a href="#" class="nav-item" data-game="profile">
+                <span class="nav-icon">👤</span>
+                <span class="nav-text">Profil</span>
+            </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -252,6 +257,58 @@
                         <span class="play-text">🃏 DAĞIT</span>
                         <span class="play-loading hidden">Dağıtılıyor...</span>
                     </button>
+                </div>
+            </section>
+
+            <!-- PROFILE SECTION -->
+            <section class="game-section hidden" id="profileSection">
+                <div class="profile-container">
+                    <div class="profile-header">
+                        <div class="profile-avatar">👤</div>
+                        <div class="profile-info">
+                            <h2 id="profileEmail">user@email.com</h2>
+                            <p class="profile-joined">Üyelik: <span id="profileJoined">-</span></p>
+                        </div>
+                    </div>
+
+                    <div class="profile-stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">🎮</div>
+                            <div class="stat-value" id="statTotalGames">0</div>
+                            <div class="stat-label">Toplam Oyun</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🏆</div>
+                            <div class="stat-value" id="statWins">0</div>
+                            <div class="stat-label">Kazanılan</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-value" id="statWinRate">0%</div>
+                            <div class="stat-label">Kazanma Oranı</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">💰</div>
+                            <div class="stat-value" id="statTotalWagered">0</div>
+                            <div class="stat-label">Toplam Bahis</div>
+                        </div>
+                    </div>
+
+                    <div class="profile-games">
+                        <div class="profile-games-header">
+                            <h3>Oyun Geçmişi</h3>
+                            <select id="gameTypeFilter" class="game-filter">
+                                <option value="">Tümü</option>
+                                <option value="coinflip">Coin Flip</option>
+                                <option value="roulette">Roulette</option>
+                                <option value="blackjack">Blackjack</option>
+                            </select>
+                        </div>
+                        <div class="games-list" id="profileGamesList">
+                            <p class="loading-text">Yükleniyor...</p>
+                        </div>
+                        <button class="btn-load-more hidden" id="loadMoreGames">Daha Fazla Yükle</button>
+                    </div>
                 </div>
             </section>
 

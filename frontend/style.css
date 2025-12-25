@@ -809,7 +809,6 @@ body {
 @keyframes winningPulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.1); }
-    border: 4px solid #4a4a6a;
 }
 
 .roulette-bets {
@@ -1442,4 +1441,251 @@ body {
 
 .active-game-modal .btn-secondary:hover {
     background: var(--bg-card-hover);
+}
+
+/* ============================================
+   Profile Section
+   ============================================ */
+
+.nav-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 15px 10px;
+}
+
+.profile-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    padding: 30px;
+    background: var(--bg-card);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    margin-bottom: 25px;
+}
+
+.profile-avatar {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+}
+
+.profile-info h2 {
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-size: 1.5rem;
+}
+
+.profile-joined {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.profile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent);
+    box-shadow: 0 10px 30px rgba(0, 255, 136, 0.1);
+}
+
+.stat-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.profile-games {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 25px;
+}
+
+.profile-games-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.profile-games-header h3 {
+    color: var(--text-primary);
+    font-size: 1.2rem;
+}
+
+.game-filter {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 15px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.game-filter:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.games-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.game-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 20px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.game-row:hover {
+    background: var(--bg-card-hover);
+}
+
+.game-row-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.game-type-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    text-align: center;
+}
+
+.game-type-name {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.game-date {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.game-row-right {
+    text-align: right;
+}
+
+.game-result {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.game-result.win {
+    color: var(--accent);
+}
+
+.game-result.lose {
+    color: #e74c3c;
+}
+
+.game-result.push {
+    color: var(--accent-gold);
+}
+
+.game-stake {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.loading-text {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 30px;
+}
+
+.no-games-text {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px;
+    font-size: 1rem;
+}
+
+.btn-load-more {
+    width: 100%;
+    padding: 15px;
+    margin-top: 15px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-load-more:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent);
+}
+
+@media (max-width: 768px) {
+    .profile-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .game-row {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .game-row-left,
+    .game-row-right {
+        text-align: center;
+    }
 }
