@@ -421,7 +421,7 @@ class GameManager {
         this.coinResult.classList.add('hidden');
 
         try {
-            const response = await fetch(`${this.apiUrl}/game/play`, {
+            const response = await fetch(`${this.apiUrl}/game/coinflip/play`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',

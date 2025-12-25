@@ -21,8 +21,8 @@ def create_app():
     from .rules import rules_bp
     app.register_blueprint(rules_bp)
 
-    from .game_logic import game_bp
-    app.register_blueprint(game_bp)
+    from .coinflip import coinflip_bp
+    app.register_blueprint(coinflip_bp)
 
     from .roulette import roulette_bp
     app.register_blueprint(roulette_bp)
