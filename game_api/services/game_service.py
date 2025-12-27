@@ -120,7 +120,7 @@ class GameService:
         try:
             conn = get_db_connection()
             if not conn:
-                return {'success': False, 'message': 'Veritabanı hatası'}
+                return {'success': False, 'message': 'Database error'}
             
             conn.start_transaction()
             cursor = conn.cursor(dictionary=True)

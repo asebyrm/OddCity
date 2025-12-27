@@ -8,13 +8,13 @@ def get_db_connection():
         conn = mysql.connector.connect(**Config.DB_CONFIG)
         return conn
     except Error as e:
-        print(f"Veritabanı bağlantı hatası: {e}")
+        print(f"Database connection error: {e}")
         return None
 
 def init_db():
     conn = get_db_connection()
     if conn is None:
-        print("Veritabanı bağlantısı kurulamadığı için tablolar oluşturulamadı.")
+        print("Could not connect to database, tables cannot be created.")
         return
 
     cursor = conn.cursor()
@@ -130,35 +130,35 @@ def init_db():
         """
     ]
     
-    # Index'ler - Performans için
+    # Indexes - For performance
     indexes = [
-        # Games tablosu index'leri
+        # Games table indexes
         "CREATE INDEX IF NOT EXISTS idx_games_user_id ON games(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_games_rule_set_id ON games(rule_set_id)",
         "CREATE INDEX IF NOT EXISTS idx_games_game_type ON games(game_type)",
         "CREATE INDEX IF NOT EXISTS idx_games_started_at ON games(started_at)",
         "CREATE INDEX IF NOT EXISTS idx_games_status ON games(status)",
         
-        # Bets tablosu index'leri
+        # Bets table indexes
         "CREATE INDEX IF NOT EXISTS idx_bets_game_id ON bets(game_id)",
         "CREATE INDEX IF NOT EXISTS idx_bets_user_id ON bets(user_id)",
         
-        # Payouts tablosu index'leri
+        # Payouts table indexes
         "CREATE INDEX IF NOT EXISTS idx_payouts_outcome ON payouts(outcome)",
         
-        # Rules tablosu index'leri
+        # Rules table indexes
         "CREATE INDEX IF NOT EXISTS idx_rules_rule_set_id ON rules(rule_set_id)",
         "CREATE INDEX IF NOT EXISTS idx_rules_rule_type ON rules(rule_type)",
         
-        # Rule sets tablosu index'leri
+        # Rule sets table indexes
         "CREATE INDEX IF NOT EXISTS idx_rule_sets_is_active ON rule_sets(is_active)",
         
         
-        # Transactions tablosu index'leri
+        # Transactions table indexes
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at)",
         
-        # Users tablosu index'leri
+        # Users table indexes
         "CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)",
         "CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin)"
     ]
@@ -167,45 +167,45 @@ def init_db():
         for table_sql in tables:
             cursor.execute(table_sql)
         conn.commit()
-        print("Veritabanı tabloları başarıyla kontrol edildi/oluşturuldu.")
+        print("Database tables checked/created successfully.")
         
-        # Index'leri oluştur
+        # Create indexes
         for index_sql in indexes:
             try:
                 cursor.execute(index_sql)
             except Error:
-                pass  # Index zaten varsa hata vermesini engelle
+                pass  # Ignore if index already exists
         conn.commit()
-        print("Index'ler oluşturuldu.")
+        print("Indexes created.")
         
-        # Default admin kullanıcısını oluştur
+        # Create default admin user
         admin_id = create_default_admin(conn, cursor)
         
-        # Default rule set ve kurallarını oluştur
+        # Create default rule set and rules
         if admin_id:
             create_default_rules(conn, cursor, admin_id)
         
     except Error as e:
-        print(f"Tablo oluşturma hatası: {e}")
+        print(f"Table creation error: {e}")
     finally:
         cursor.close()
         conn.close()
 
 def create_default_admin(conn, cursor):
-    """Default admin kullanıcısını oluştur"""
+    """Create default admin user"""
     try:
-        # Admin kullanıcısı var mı kontrol et
+        # Check if admin user exists
         cursor.execute("SELECT user_id FROM users WHERE email = 'admin@example.com'")
         existing_admin = cursor.fetchone()
         
         if existing_admin:
             admin_id = existing_admin[0]
-            # Admin yetkisini garanti et
+            # Ensure admin privilege
             cursor.execute("UPDATE users SET is_admin = TRUE WHERE user_id = %s", (admin_id,))
-            print(f"Default admin kullanıcısı zaten mevcut (user_id: {admin_id})")
+            print(f"Default admin user already exists (user_id: {admin_id})")
             return admin_id
         
-        # Admin kullanıcısı oluştur
+        # Create admin user
         admin_email = 'admin@example.com'
         admin_password = 'admin'
         hashed_password = generate_password_hash(admin_password)
@@ -217,67 +217,67 @@ def create_default_admin(conn, cursor):
         
         admin_id = cursor.lastrowid
         
-        # Admin için wallet oluştur
+        # Create wallet for admin
         cursor.execute("INSERT INTO wallets (user_id) VALUES (%s)", (admin_id,))
         
         conn.commit()
-        print(f"\n[OK] Default admin kullanıcisi olusturuldu:")
+        print(f"\n[OK] Default admin user created:")
         print(f"   Email: {admin_email}")
-        print(f"   Sifre: {admin_password}")
+        print(f"   Password: {admin_password}")
         print(f"   User ID: {admin_id}")
         
         return admin_id
         
     except Error as e:
-        print(f"Default admin oluşturma hatası: {e}")
+        print(f"Default admin creation error: {e}")
         conn.rollback()
         return None
 
 def create_default_rules(conn, cursor, admin_id):
-    """Default, Hard ve Easy rule set'lerini oluştur"""
+    """Create Default, Hard and Easy rule sets"""
     
-    # 3 farklı rule set tanımı
+    # 3 different rule set definitions
     rule_sets = [
         {
             'name': 'Default Rules',
-            'description': 'Varsayılan oyun kuralları - Dengeli payout oranları',
+            'description': 'Default game rules - Balanced payout rates',
             'house_edge': 5.0,
-            'is_active': True,  # Sadece bu aktif
+            'is_active': True,  # Only this one is active
             'rules': [
-                ('coinflip_payout', '1.95'),      # %2.5 ev avantajı
-                ('roulette_number_payout', '35'), # 35:1 (tek sayı)
-                ('roulette_color_payout', '1'),   # 1:1 (kırmızı/siyah)
-                ('roulette_parity_payout', '1'),  # 1:1 (tek/çift)
+                ('coinflip_payout', '1.95'),      # 2.5% house edge
+                ('roulette_number_payout', '35'), # 35:1 (single number)
+                ('roulette_color_payout', '1'),   # 1:1 (red/black)
+                ('roulette_parity_payout', '1'),  # 1:1 (odd/even)
                 ('blackjack_payout', '2.5'),      # Blackjack 3:2
-                ('blackjack_normal_payout', '2.0') # Normal kazanç 1:1
+                ('blackjack_normal_payout', '2.0') # Normal win 1:1
             ]
         },
         {
             'name': 'Hard Mode',
-            'description': 'Zor mod - Düşük payout oranları (Ev avantajı yüksek)',
+            'description': 'Hard mode - Low payout rates (High house edge)',
             'house_edge': 8.0,
             'is_active': False,
             'rules': [
-                ('coinflip_payout', '1.92'),      # %4 ev avantajı
-                ('roulette_number_payout', '34'), # 34:1 (düşük)
-                ('roulette_color_payout', '0.95'),# 0.95:1 (düşük)
-                ('roulette_parity_payout', '0.95'),# 0.95:1 (düşük)
+                ('coinflip_payout', '1.92'),      # 4% house edge
+                ('roulette_number_payout', '34'), # 34:1 (low)
+                ('roulette_color_payout', '0.95'),# 0.95:1 (low)
+                ('roulette_parity_payout', '0.95'),# 0.95:1 (low)
                 ('blackjack_payout', '2.2'),      # Blackjack 6:5
-                ('blackjack_normal_payout', '1.9') # Normal kazanç düşük
+                ('blackjack_normal_payout', '1.9') # Normal win low
             ]
         },
         {
             'name': 'Easy Mode',
-            'description': 'Kolay mod - Yüksek payout oranları (Oyuncu avantajlı)',
+            'description': 'Easy mode - High payout rates (Player advantage)',
             'house_edge': 2.0,
             'is_active': False,
             'rules': [
-                ('coinflip_payout', '1.98'),      # %1 ev avantajı
-                ('roulette_number_payout', '36'), # 36:1 (yüksek)
-                ('roulette_color_payout', '1.05'),# 1.05:1 (yüksek)
-                ('roulette_parity_payout', '1.05'),# 1.05:1 (yüksek)
+                ('coinflip_payout', '1.98'),      # 1% house edge
+                ('roulette_number_payout', '36'), # 36:1 (high)
+                ('roulette_color_payout', '1.05'),# 1.05:1 (high)
+                ('roulette_parity_payout', '1.05'),# 1.05:1 (high)
                 ('blackjack_payout', '2.5'),      # Blackjack 3:2
-                ('blackjack_normal_payout', '2.1') # Normal kazanç yüksek
+                ('blackjack_normal_payout', '2.1') # Normal win high
             ]
         }
     ]
@@ -286,15 +286,15 @@ def create_default_rules(conn, cursor, admin_id):
         created_count = 0
         
         for rule_set in rule_sets:
-            # Rule set var mı kontrol et
+            # Check if rule set exists
             cursor.execute("SELECT rule_set_id FROM rule_sets WHERE name = %s", (rule_set['name'],))
             existing = cursor.fetchone()
             
             if existing:
-                print(f"   {rule_set['name']} zaten mevcut.")
+                print(f"   {rule_set['name']} already exists.")
                 continue
             
-            # Rule set oluştur
+            # Create rule set
             cursor.execute("""
                 INSERT INTO rule_sets (name, description, house_edge, created_by_admin_id, is_active)
                 VALUES (%s, %s, %s, %s, %s)
@@ -303,7 +303,7 @@ def create_default_rules(conn, cursor, admin_id):
             
             rule_set_id = cursor.lastrowid
             
-            # Kuralları ekle
+            # Add rules
             for rule_type, rule_param in rule_set['rules']:
                 cursor.execute("""
                     INSERT INTO rules (rule_set_id, rule_type, rule_param)
@@ -311,19 +311,19 @@ def create_default_rules(conn, cursor, admin_id):
                 """, (rule_set_id, rule_type, rule_param))
             
             created_count += 1
-            status = "AKTIF" if rule_set['is_active'] else "PASIF"
-            print(f"\n[OK] {rule_set['name']} olusturuldu (ID: {rule_set_id}) [{status}]")
-            print(f"   Ev avantaji: {rule_set['house_edge']}%")
-            print("   Kurallar:")
+            status = "ACTIVE" if rule_set['is_active'] else "INACTIVE"
+            print(f"\n[OK] {rule_set['name']} created (ID: {rule_set_id}) [{status}]")
+            print(f"   House edge: {rule_set['house_edge']}%")
+            print("   Rules:")
             for rule_type, rule_param in rule_set['rules']:
                 print(f"   - {rule_type}: {rule_param}")
         
         if created_count > 0:
             conn.commit()
-            print(f"\n[OK] Toplam {created_count} rule set olusturuldu.")
-            print("   Default Rules AKTIF durumda.")
-            print("   Admin panelden diger rule set'leri aktif edebilirsiniz.")
+            print(f"\n[OK] Total {created_count} rule sets created.")
+            print("   Default Rules is ACTIVE.")
+            print("   You can activate other rule sets from the admin panel.")
         
     except Error as e:
-        print(f"Rule set oluşturma hatası: {e}")
+        print(f"Rule set creation error: {e}")
         conn.rollback()

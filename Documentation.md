@@ -1,4 +1,4 @@
-# Milestone 3: Database Queries and RESTful API Development Report
+# OddCity Full Documentation
 
 ## OddCity - Virtual Casino Gaming Platform
 
@@ -429,12 +429,10 @@ All API endpoints follow RESTful conventions with appropriate HTTP methods (GET,
 | POST | `/admin/rule-sets/<id>/deactivate` | **UPDATE** - Deactivate rule set | Admin + CSRF |
 | DELETE | `/admin/rule-sets/<id>` | **DELETE** - Delete rule set | Admin + CSRF |
 
-#### Individual Rule Management (Full CRUD)
+#### Individual Rule Management
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
 | POST | `/admin/rule-sets/<id>/rules` | **CREATE** - Add rule | Admin + CSRF |
-| PUT | `/admin/rules/<id>` | **UPDATE** - Modify rule | Admin + CSRF |
-| DELETE | `/admin/rules/<id>` | **DELETE** - Remove rule | Admin + CSRF |
 | GET | `/admin/rule-types` | **READ** - List available rule types | Admin |
 
 #### Dashboard Statistics

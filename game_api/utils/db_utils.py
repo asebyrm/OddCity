@@ -18,7 +18,7 @@ def db_transaction():
     """
     conn = get_db_connection()
     if conn is None:
-        raise ConnectionError("Veritabanı bağlantısı kurulamadı")
+        raise ConnectionError("Database connection failed")
     
     cursor = conn.cursor(dictionary=True)
     
@@ -46,7 +46,7 @@ def get_cursor(dictionary=True):
     """
     conn = get_db_connection()
     if conn is None:
-        raise ConnectionError("Veritabanı bağlantısı kurulamadı")
+        raise ConnectionError("Database connection failed")
     
     cursor = conn.cursor(dictionary=dictionary)
     

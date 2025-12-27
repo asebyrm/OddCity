@@ -52,7 +52,7 @@ def list_users():
         description: Admin access required
     """
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
@@ -66,7 +66,7 @@ def list_users():
         users = cursor.fetchall()
         return jsonify(users)
     except Error as e:
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -129,7 +129,7 @@ def ban_user(user_id):
         description: Admin access required or invalid CSRF token
     """
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor()
     try:
@@ -137,13 +137,13 @@ def ban_user(user_id):
         cursor.execute("SELECT is_admin FROM users WHERE user_id = %s", (user_id,))
         user = cursor.fetchone()
         if user and user[0]:
-             return jsonify({'message': 'Adminler yasaklanamaz!'}), 400
+             return jsonify({'message': 'Admins cannot be banned!'}), 400
 
         cursor.execute("UPDATE users SET status = 'BANNED' WHERE user_id = %s", (user_id,))
         conn.commit()
-        return jsonify({'message': 'Kullanıcı yasaklandı.'})
+        return jsonify({'message': 'User banned.'})
     except Error as e:
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -202,15 +202,15 @@ def unban_user(user_id):
         description: Admin access required or invalid CSRF token
     """
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor()
     try:
         cursor.execute("UPDATE users SET status = 'ACTIVE' WHERE user_id = %s", (user_id,))
         conn.commit()
-        return jsonify({'message': 'Kullanıcı yasağı kaldırıldı.'})
+        return jsonify({'message': 'User ban removed.'})
     except Error as e:
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -261,7 +261,7 @@ def user_history(user_id):
         description: User wallet not found
     """
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
@@ -269,7 +269,7 @@ def user_history(user_id):
         cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = %s", (user_id,))
         wallet = cursor.fetchone()
         if not wallet:
-            return jsonify({'message': 'Cüzdan bulunamadı'}), 404
+            return jsonify({'message': 'Wallet not found'}), 404
             
         wallet_id = wallet['wallet_id']
         
@@ -285,7 +285,7 @@ def user_history(user_id):
         history = cursor.fetchall()
         return jsonify(history)
     except Error as e:
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -375,11 +375,11 @@ def dashboard_stats():
     
     conn = get_db_connection()
     if not conn: 
-        return jsonify({'message': 'Veritabanı hatası'}), 500
+        return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
-        # Genel oyun istatistikleri
+        # General game statistics
         cursor.execute("""
             SELECT 
                 COUNT(DISTINCT g.game_id) as total_games,
@@ -396,7 +396,7 @@ def dashboard_stats():
         """, (days,))
         game_stats = cursor.fetchone()
         
-        # Oyun tipine göre dağılım
+        # Distribution by game type
         cursor.execute("""
             SELECT 
                 game_type,
@@ -430,7 +430,7 @@ def dashboard_stats():
         
         game_type_stats = list(game_types_map.values())
         
-        # Kullanıcı istatistikleri
+        # User statistics
         cursor.execute("""
             SELECT 
                 COUNT(*) as total_users,
@@ -441,11 +441,11 @@ def dashboard_stats():
         """)
         user_stats = cursor.fetchone()
         
-        # Toplam bakiye
+        # Total balance
         cursor.execute("SELECT COALESCE(SUM(balance), 0) as total_balance FROM wallets")
         wallet_stats = cursor.fetchone()
         
-        # Transaction istatistikleri
+        # Transaction statistics
         cursor.execute("""
             SELECT 
                 tx_type,
@@ -477,7 +477,7 @@ def dashboard_stats():
         if not withdraw_found:
             tx_stats.append({'tx_type': 'WITHDRAW', 'count': 0, 'total_amount': 0})
         
-        # Rule set istatistikleri
+        # Rule set statistics
         cursor.execute("""
             SELECT 
                 rs.rule_set_id,
@@ -490,7 +490,7 @@ def dashboard_stats():
         """)
         rule_stats = cursor.fetchall()
         
-        # Hesaplamalar
+        # Calculations
         total_bets = float(game_stats['total_bets'] or 0)
         total_payouts = float(game_stats['total_payouts'] or 0)
         house_profit = total_bets - total_payouts
@@ -527,7 +527,7 @@ def dashboard_stats():
         
     except Error as e:
         admin_logger.error(f"Dashboard stats error: {e}")
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -598,7 +598,7 @@ def recent_games():
     
     conn = get_db_connection()
     if not conn: 
-        return jsonify({'message': 'Veritabanı hatası'}), 500
+        return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
@@ -643,7 +643,7 @@ def recent_games():
         return jsonify(games)
         
     except Error as e:
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -728,11 +728,11 @@ def top_players():
     
     conn = get_db_connection()
     if not conn: 
-        return jsonify({'message': 'Veritabanı hatası'}), 500
+        return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
-        # En çok oynayan
+        # Most active
         cursor.execute("""
             SELECT 
                 u.user_id,
@@ -751,7 +751,7 @@ def top_players():
         """, (days, limit))
         most_active = cursor.fetchall()
         
-        # En çok kazanan
+        # Top winners
         cursor.execute("""
             SELECT 
                 u.user_id,
@@ -770,7 +770,7 @@ def top_players():
         """, (days, limit))
         top_winners = cursor.fetchall()
         
-        # En çok kaybeden
+        # Top losers
         cursor.execute("""
             SELECT 
                 u.user_id,
@@ -803,7 +803,7 @@ def top_players():
         })
         
     except Error as e:
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()

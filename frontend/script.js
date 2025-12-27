@@ -26,7 +26,7 @@ class GameManager {
         this.sidebar = document.getElementById('sidebar');
         this.menuToggle = document.getElementById('menuToggle');
         this.navItems = document.querySelectorAll('.nav-item');
-        
+
         // Auth
         this.guestButtons = document.getElementById('guestButtons');
         this.userInfo = document.getElementById('userInfo');
@@ -34,13 +34,13 @@ class GameManager {
         this.loginBtn = document.getElementById('loginBtn');
         this.registerBtn = document.getElementById('registerBtn');
         this.logoutBtn = document.getElementById('logoutBtn');
-        
+
         // Balance
         this.balanceValue = document.getElementById('balanceValue');
         this.walletButtons = document.getElementById('walletButtons');
         this.depositBtn = document.getElementById('depositBtn');
         this.withdrawBtn = document.getElementById('withdrawBtn');
-        
+
         // Game sections
         this.gameTitle = document.getElementById('gameTitle');
         this.coinflipGame = document.getElementById('coinflipGame');
@@ -49,7 +49,7 @@ class GameManager {
         this.profileSection = document.getElementById('profileSection');
         this.historySection = document.getElementById('historySection');
         this.historyList = document.getElementById('historyList');
-        
+
         // Profile elements
         this.profileEmail = document.getElementById('profileEmail');
         this.profileJoined = document.getElementById('profileJoined');
@@ -61,19 +61,19 @@ class GameManager {
         this.gameTypeFilter = document.getElementById('gameTypeFilter');
         this.loadMoreGames = document.getElementById('loadMoreGames');
         this.profileGamesOffset = 0;
-        
+
         // Auth Modal
         this.authModal = document.getElementById('authModal');
         this.loginForm = document.getElementById('loginForm');
         this.registerForm = document.getElementById('registerForm');
         this.authModalClose = document.getElementById('authModalClose');
-        
+
         // Wallet Modal
         this.walletModal = document.getElementById('walletModal');
         this.walletTitle = document.getElementById('walletTitle');
         this.walletAmount = document.getElementById('walletAmount');
         this.walletModalClose = document.getElementById('walletModalClose');
-        
+
         // Notification
         this.notification = document.getElementById('notification');
         this.notificationText = document.getElementById('notificationText');
@@ -99,7 +99,7 @@ class GameManager {
         this.loginBtn.addEventListener('click', () => this.showAuthModal('login'));
         this.registerBtn.addEventListener('click', () => this.showAuthModal('register'));
         this.logoutBtn.addEventListener('click', () => this.logout());
-        
+
         // Auth modal
         this.authModalClose.addEventListener('click', () => this.hideModal(this.authModal));
         document.getElementById('showRegister').addEventListener('click', (e) => {
@@ -110,7 +110,7 @@ class GameManager {
             e.preventDefault();
             this.showAuthModal('login');
         });
-        
+
         // Auth forms
         document.getElementById('loginFormElement').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -125,7 +125,7 @@ class GameManager {
         this.depositBtn.addEventListener('click', () => this.showWalletModal('deposit'));
         this.withdrawBtn.addEventListener('click', () => this.showWalletModal('withdraw'));
         this.walletModalClose.addEventListener('click', () => this.hideModal(this.walletModal));
-        
+
         // Wallet form
         document.getElementById('walletFormElement').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -188,13 +188,13 @@ class GameManager {
                 this.currentUser = data;
                 await this.onLogin(data);
                 this.hideModal(this.authModal);
-                this.showNotification('Giriş başarılı!', 'success');
+                this.showNotification('Login successful!', 'success');
             } else {
-                this.showNotification(data.message || 'Giriş başarısız!', 'error');
+                this.showNotification(data.message || 'Login failed!', 'error');
             }
         } catch (error) {
             console.error('Login error:', error);
-            this.showNotification('Bağlantı hatası!', 'error');
+            this.showNotification('Connection error!', 'error');
         }
     }
 
@@ -213,14 +213,14 @@ class GameManager {
             const data = await response.json();
 
             if (response.ok) {
-                this.showNotification('Kayıt başarılı! Giriş yapabilirsiniz.', 'success');
+                this.showNotification('Registration successful! You can now log in.', 'success');
                 this.showAuthModal('login');
             } else {
-                this.showNotification(data.message || 'Kayıt başarısız!', 'error');
+                this.showNotification(data.message || 'Registration failed!', 'error');
             }
         } catch (error) {
             console.error('Register error:', error);
-            this.showNotification('Bağlantı hatası!', 'error');
+            this.showNotification('Connection error!', 'error');
         }
     }
 
@@ -238,7 +238,7 @@ class GameManager {
         this.currentUser = null;
         this.csrfToken = null;
         this.onLogout();
-        this.showNotification('Çıkış yapıldı', 'success');
+        this.showNotification('Logged out', 'success');
     }
 
     async onLogin(user) {
@@ -247,10 +247,10 @@ class GameManager {
         this.walletButtons.classList.remove('hidden');
         this.historySection.classList.remove('hidden');
         this.userEmail.textContent = user.email;
-        
+
         // CSRF token al
         await this.fetchCsrfToken();
-        
+
         // Eğer user objesinde balance varsa direkt kullan, yoksa fetch et
         if (user.balance !== undefined && user.balance !== null) {
             this.balance = parseFloat(user.balance);
@@ -258,9 +258,9 @@ class GameManager {
         } else {
             await this.fetchBalance();
         }
-        
+
         this.enableGameControls();
-        
+
         // Aktif oyun kontrolü
         if (user.has_active_game && user.active_game) {
             this.showActiveGamePrompt(user.active_game);
@@ -270,28 +270,28 @@ class GameManager {
     showActiveGamePrompt(activeGame) {
         const gameNames = {
             'blackjack': 'Blackjack',
-            'roulette': 'Rulet',
-            'coinflip': 'Yazı Tura'
+            'roulette': 'Roulette',
+            'coinflip': 'Coin Flip'
         };
-        
+
         const gameName = gameNames[activeGame.game_type] || activeGame.game_type;
-        
+
         // Modal oluştur
         const modal = document.createElement('div');
         modal.className = 'modal active-game-modal';
         modal.innerHTML = `
             <div class="modal-content">
-                <h3>Yarım Kalan Oyun</h3>
-                <p>Tamamlanmamış bir <strong>${gameName}</strong> oyununuz var.</p>
-                <p class="text-muted">Oyununuzu tamamlamanız gerekmektedir.</p>
+                <h3>Unfinished Game</h3>
+                <p>You have an unfinished <strong>${gameName}</strong> game.</p>
+                <p class="text-muted">You need to complete your game.</p>
                 <div class="modal-buttons">
-                    <button class="btn btn-primary" id="resumeGameBtn">Devam Et</button>
+                    <button class="btn btn-primary" id="resumeGameBtn">Resume</button>
                 </div>
             </div>
         `;
-        
+
         document.body.appendChild(modal);
-        
+
         document.getElementById('resumeGameBtn').addEventListener('click', async () => {
             await this.resumeActiveGame(activeGame.game_type);
             modal.remove();
@@ -306,26 +306,26 @@ class GameManager {
                     headers: this.getSecureHeaders(),
                     credentials: 'include'
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     // Blackjack oyununa geç
                     this.switchGame('blackjack');
-                    
+
                     // Oyun durumunu yükle
                     this.bjGameActive = true;
                     this.bjBetSection.classList.add('hidden');
                     this.bjActions.classList.remove('hidden');
                     this.bjPlayBtn.classList.add('hidden');
-                    
+
                     this.renderBlackjackHands(data);
                     this.balance = data.new_balance;
                     this.updateBalanceDisplay();
-                    
-                    this.showNotification('Oyuna devam ediliyor!', 'success');
+
+                    this.showNotification('Resuming game!', 'success');
                 } else {
-                    this.showNotification(data.message || 'Oyun yüklenemedi!', 'error');
+                    this.showNotification(data.message || 'Could not load game!', 'error');
                 }
             } catch (error) {
                 console.error('Resume error:', error);
@@ -342,11 +342,11 @@ class GameManager {
         this.historySection.classList.add('hidden');
         this.balanceValue.textContent = '0.00';
         this.balance = 0;
-        
+
         // Tüm oyun verilerini temizle
         this.gameHistory = [];
         this.historyList.innerHTML = '';
-        
+
         // Blackjack state temizle
         this.bjGameActive = false;
         if (this.dealerCards) this.dealerCards.innerHTML = '';
@@ -357,16 +357,16 @@ class GameManager {
         if (this.bjActions) this.bjActions.classList.add('hidden');
         if (this.bjBetSection) this.bjBetSection.classList.remove('hidden');
         if (this.bjPlayBtn) this.bjPlayBtn.classList.remove('hidden');
-        
+
         // Coinflip & Roulette seçimlerini temizle
         this.coinChoice = null;
         this.rouletteBet = null;
-        if (this.selectedBet) this.selectedBet.textContent = 'Seçim yapın...';
-        
+        if (this.selectedBet) this.selectedBet.textContent = 'Make a selection...';
+
         // Sonuç alanlarını gizle
         if (this.coinResult) this.coinResult.classList.add('hidden');
         if (this.rouletteResult) this.rouletteResult.classList.add('hidden');
-        
+
         this.disableGameControls();
     }
 
@@ -423,8 +423,8 @@ class GameManager {
 
     showWalletModal(type) {
         this.walletType = type;
-        this.walletTitle.textContent = type === 'deposit' ? '💰 Para Yatır' : '💸 Para Çek';
-        document.getElementById('walletSubmitBtn').textContent = type === 'deposit' ? 'Yatır' : 'Çek';
+        this.walletTitle.textContent = type === 'deposit' ? '💰 Deposit' : '💸 Withdraw';
+        document.getElementById('walletSubmitBtn').textContent = type === 'deposit' ? 'Deposit' : 'Withdraw';
         this.walletAmount.value = '';
         this.walletModal.classList.remove('hidden');
     }
@@ -432,7 +432,7 @@ class GameManager {
     async processWallet() {
         const amount = parseFloat(this.walletAmount.value);
         if (!amount || amount <= 0) {
-            this.showNotification('Geçerli bir miktar girin!', 'error');
+            this.showNotification('Please enter a valid amount!', 'error');
             return;
         }
 
@@ -454,7 +454,7 @@ class GameManager {
                 this.hideModal(this.walletModal);
                 this.showNotification(data.message, 'success');
             } else {
-                this.showNotification(data.message || 'İşlem başarısız!', 'error');
+                this.showNotification(data.message || 'Transaction failed!', 'error');
             }
         } catch (error) {
             console.error('Wallet error:', error);
@@ -486,7 +486,7 @@ class GameManager {
             coinflip: 'Coin Flip',
             roulette: 'Roulette',
             blackjack: 'Blackjack',
-            profile: 'Profil'
+            profile: 'Profile'
         };
         this.gameTitle.textContent = titles[game] || game;
 
@@ -495,12 +495,12 @@ class GameManager {
         this.rouletteGame.classList.toggle('hidden', game !== 'roulette');
         this.blackjackGame.classList.toggle('hidden', game !== 'blackjack');
         this.profileSection.classList.toggle('hidden', game !== 'profile');
-        
+
         // Hide history for profile
         if (this.historySection) {
             this.historySection.classList.toggle('hidden', game === 'profile' || !this.currentUser);
         }
-        
+
         // Load profile data when switching to profile
         if (game === 'profile' && this.currentUser) {
             this.loadProfile();
@@ -519,7 +519,7 @@ class GameManager {
         const item = document.createElement('div');
         item.className = `history-item ${isWin ? 'win' : 'lose'}`;
         item.textContent = isWin ? '✓' : '✗';
-        
+
         if (this.historyList.children.length >= 20) {
             this.historyList.removeChild(this.historyList.lastChild);
         }
@@ -565,12 +565,12 @@ class GameManager {
 
         const amount = parseFloat(this.coinBetAmount.value);
         if (!amount || amount <= 0) {
-            this.showNotification('Geçerli bir bahis miktarı girin!', 'error');
+            this.showNotification('Please enter a valid bet amount!', 'error');
             return;
         }
 
         if (amount > this.balance) {
-            this.showNotification('Yetersiz bakiye!', 'error');
+            this.showNotification('Insufficient balance!', 'error');
             return;
         }
 
@@ -602,7 +602,7 @@ class GameManager {
                     this.addToHistory(data.result, isWin);
                 }, 2500);
             } else {
-                this.showNotification(data.message || 'Oyun hatası!', 'error');
+                this.showNotification(data.message || 'Game error!', 'error');
                 this.coinPlayBtn.disabled = false;
             }
         } catch (error) {
@@ -615,11 +615,11 @@ class GameManager {
     showCoinResult(isWin, data) {
         this.coinResult.classList.remove('hidden', 'win', 'lose');
         this.coinResult.classList.add(isWin ? 'win' : 'lose');
-        
+
         this.coinResult.querySelector('.result-icon').textContent = isWin ? '🎉' : '😔';
-        this.coinResult.querySelector('.result-text').textContent = isWin ? 'KAZANDINIZ!' : 'KAYBETTİNİZ';
+        this.coinResult.querySelector('.result-text').textContent = isWin ? 'YOU WON!' : 'YOU LOST';
         this.coinResult.querySelector('.result-amount').textContent = data.message;
-        
+
         // Reset for next game
         setTimeout(() => {
             this.coinPlayBtn.disabled = false;
@@ -649,15 +649,15 @@ class GameManager {
             0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10,
             5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
         ];
-        
+
         this.redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-        
+
         // Şeridi oluştur (5 tekrar - sonsuz döngü hissi için)
         this.buildRouletteStrip();
 
         // Generate number buttons
         const numbersContainer = document.querySelector('#rouletteGame .bet-row.numbers');
-        
+
         for (let i = 1; i <= 36; i++) {
             const btn = document.createElement('button');
             btn.className = `bet-option ${this.redNumbers.includes(i) ? 'red' : 'black'}`;
@@ -681,23 +681,23 @@ class GameManager {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('#rouletteGame .bet-option').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
-                
+
                 this.rouletteBet = {
                     type: btn.dataset.type,
                     value: btn.dataset.value
                 };
-                
+
                 const labels = {
-                    color: { red: '🔴 Kırmızı', black: '⚫ Siyah' },
-                    parity: { even: 'Çift', odd: 'Tek' },
+                    color: { red: '🔴 Red', black: '⚫ Black' },
+                    parity: { even: 'Even', odd: 'Odd' },
                     number: btn.dataset.value
                 };
-                
-                const betLabel = btn.dataset.type === 'number' 
-                    ? `Sayı: ${btn.dataset.value}` 
+
+                const betLabel = btn.dataset.type === 'number'
+                    ? `Number: ${btn.dataset.value}`
                     : labels[btn.dataset.type][btn.dataset.value];
-                
-                this.selectedBet.textContent = `Seçim: ${betLabel}`;
+
+                this.selectedBet.textContent = `Choice: ${betLabel}`;
                 this.roulettePlayBtn.disabled = false;
             });
         });
@@ -708,7 +708,7 @@ class GameManager {
 
     buildRouletteStrip() {
         this.rouletteStrip.innerHTML = '';
-        
+
         // 10 tekrar oluştur (sonsuz döngü hissi için)
         this.stripRepeatCount = 10;
         for (let repeat = 0; repeat < this.stripRepeatCount; repeat++) {
@@ -724,7 +724,7 @@ class GameManager {
                 this.rouletteStrip.appendChild(numberEl);
             });
         }
-        
+
         // Başlangıç pozisyonu
         this.stripNumberWidth = 60;
         this.stripResetPosition();
@@ -743,26 +743,26 @@ class GameManager {
 
         const amount = parseFloat(this.rouletteBetAmount.value);
         if (!amount || amount <= 0) {
-            this.showNotification('Geçerli bir bahis miktarı girin!', 'error');
+            this.showNotification('Please enter a valid bet amount!', 'error');
             return;
         }
 
         if (amount > this.balance) {
-            this.showNotification('Yetersiz bakiye!', 'error');
+            this.showNotification('Insufficient balance!', 'error');
             return;
         }
 
         this.roulettePlayBtn.disabled = true;
         this.rouletteResult.classList.add('hidden');
         this.stripResultDisplay.classList.add('hidden');
-        
+
         // Önceki kazanan işaretini temizle
         this.rouletteStrip.querySelectorAll('.winning').forEach(el => el.classList.remove('winning'));
-        
+
         // Şeridi sıfırla ve animasyon için hazırla
         this.rouletteStrip.style.transition = 'none';
         this.stripResetPosition();
-        
+
         // Bir frame bekle ki browser yeni pozisyonu render etsin
         await new Promise(resolve => requestAnimationFrame(resolve));
 
@@ -785,7 +785,7 @@ class GameManager {
                 const result = data.winning_number;
                 const isWin = data.is_win;
                 const color = data.winning_color;
-                
+
                 // Şerit animasyonu
                 this.animateRouletteStrip(result, () => {
                     this.showRouletteResult(result, color, isWin, data.payout, data.message);
@@ -794,7 +794,7 @@ class GameManager {
                     this.addToHistory(result, isWin);
                 });
             } else {
-                this.showNotification(data.message || 'Oyun hatası!', 'error');
+                this.showNotification(data.message || 'Game error!', 'error');
                 this.roulettePlayBtn.disabled = false;
             }
         } catch (error) {
@@ -807,32 +807,32 @@ class GameManager {
     animateRouletteStrip(resultNumber, callback) {
         // Sonuç gösterimini gizle
         this.stripResultDisplay.classList.add('hidden');
-        
+
         // Sonuç sayısının şeritteki indeksini bul
         const resultIndex = this.rouletteSequence.indexOf(resultNumber);
-        
+
         if (resultIndex === -1) {
             console.error('Sonuç sayısı şeritte bulunamadı:', resultNumber);
             callback();
             return;
         }
-        
+
         // 3-5 tam tur + sonuç pozisyonuna git
         const fullRotations = 3 + Math.floor(Math.random() * 3); // 3-5 tur
         const numbersToTravel = fullRotations * this.rouletteSequence.length + resultIndex;
-        
+
         // Her sayı 60px genişliğinde
         const travelDistance = numbersToTravel * this.stripNumberWidth;
-        
+
         // 2. tekrardan başlıyoruz
         const startRepeat = 2;
         const startPosition = startRepeat * this.rouletteSequence.length * this.stripNumberWidth;
         const finalPosition = startPosition + travelDistance;
-        
+
         // Animasyonu başlat
         this.rouletteStrip.style.transition = 'transform 4s cubic-bezier(0.15, 0.85, 0.35, 1)';
         this.rouletteStrip.style.transform = `translateX(-${finalPosition}px)`;
-        
+
         // Animasyon bitince
         setTimeout(() => {
             // Kazanan sayıyı işaretle
@@ -842,12 +842,12 @@ class GameManager {
                     el.classList.add('winning');
                 }
             });
-            
+
             // Sonuç gösterimini güncelle ve göster
             this.showStripResult(resultNumber);
-            
+
             callback();
-            
+
             // Bir süre sonra şeridi sıfırla
             setTimeout(() => {
                 this.rouletteStrip.style.transition = 'none';
@@ -863,7 +863,7 @@ class GameManager {
     showStripResult(number) {
         const colorName = number === 0 ? 'Yeşil' : (this.redNumbers.includes(number) ? 'Kırmızı' : 'Siyah');
         const colorClass = number === 0 ? 'green' : (this.redNumbers.includes(number) ? 'red' : 'black');
-        
+
         this.stripResultNum.textContent = number;
         this.stripResultNum.className = `result-num ${colorClass}`;
         this.stripResultColor.textContent = colorName;
@@ -873,19 +873,19 @@ class GameManager {
     showRouletteResult(result, color, isWin, payout, message) {
         this.rouletteResult.classList.remove('hidden', 'win', 'lose');
         this.rouletteResult.classList.add(isWin ? 'win' : 'lose');
-        
+
         const colorClass = result === 0 ? 'green' : (color === 'red' ? 'red' : 'black');
         this.rouletteResult.querySelector('.result-number').textContent = result;
         this.rouletteResult.querySelector('.result-number').className = `result-number ${colorClass}`;
         this.rouletteResult.querySelector('.result-text').textContent = isWin ? 'KAZANDINIZ!' : 'KAYBETTİNİZ';
-        
+
         // Kazanç miktarını göster
         if (isWin && payout > 0) {
             this.rouletteResult.querySelector('.result-amount').textContent = `+${payout.toFixed(2)} ₿`;
         } else {
             this.rouletteResult.querySelector('.result-amount').textContent = message;
         }
-        
+
         // Reset for next game
         setTimeout(() => {
             this.roulettePlayBtn.disabled = false;
@@ -959,7 +959,7 @@ class GameManager {
                 this.bjBetSection.classList.add('hidden');
                 this.bjActions.classList.remove('hidden');
                 this.bjPlayBtn.classList.add('hidden');
-                
+
                 this.renderBlackjackHands(data);
                 this.balance = data.new_balance;
                 this.updateBalanceDisplay();
@@ -991,7 +991,7 @@ class GameManager {
 
             if (response.ok) {
                 this.renderBlackjackHands(data);
-                
+
                 // Check if game is over (bust or finished)
                 if (data.status === 'bust' || data.status === 'finished') {
                     this.endBlackjack(data);
@@ -1038,7 +1038,7 @@ class GameManager {
         // Backend sends different field names depending on the endpoint
         // start: player_hand, dealer_card (single card shown)
         // hit/stand: player_hand, dealer_hand (full hand)
-        
+
         // Render dealer cards
         const dealerCards = data.dealer_hand || (data.dealer_card ? [data.dealer_card] : []);
         if (dealerCards.length > 0) {
@@ -1052,7 +1052,7 @@ class GameManager {
                     this.dealerCards.appendChild(this.createCardElement(card));
                 }
             });
-            
+
             // If only one dealer card shown (from start), add hidden card
             if (!data.dealer_hand && data.dealer_card && !isGameOver) {
                 const cardEl = document.createElement('div');
@@ -1074,15 +1074,15 @@ class GameManager {
 
     createCardElement(card) {
         // Backend uses H, D, C, S for suits
-        const suits = { 
+        const suits = {
             'H': '♥', 'hearts': '♥',
-            'D': '♦', 'diamonds': '♦', 
-            'C': '♣', 'clubs': '♣', 
-            'S': '♠', 'spades': '♠' 
+            'D': '♦', 'diamonds': '♦',
+            'C': '♣', 'clubs': '♣',
+            'S': '♠', 'spades': '♠'
         };
         const suitSymbol = suits[card.suit] || card.suit;
         const isRed = card.suit === 'H' || card.suit === 'D' || card.suit === 'hearts' || card.suit === 'diamonds';
-        
+
         const cardEl = document.createElement('div');
         cardEl.className = `card ${isRed ? 'red' : 'black'}`;
         cardEl.innerHTML = `
@@ -1096,15 +1096,15 @@ class GameManager {
     endBlackjack(data) {
         this.bjGameActive = false;
         this.bjActions.classList.add('hidden');
-        
+
         // Determine win status from result
         const isWin = data.result === 'win' || data.status === 'blackjack';
         const isPush = data.result === 'push';
-        
+
         // Show result message
         this.bjMessage.classList.remove('hidden');
         this.bjMessage.textContent = data.message || (isWin ? 'Kazandınız!' : 'Kaybettiniz!');
-        
+
         // Update balance
         if (data.new_balance !== undefined) {
             this.balance = data.new_balance;
@@ -1141,7 +1141,7 @@ class GameManager {
                 this.loadProfileGames(true);
             });
         }
-        
+
         // Load more button
         if (this.loadMoreGames) {
             this.loadMoreGames.addEventListener('click', () => {
@@ -1217,13 +1217,13 @@ class GameManager {
 
     async loadProfile() {
         if (!this.currentUser) return;
-        
+
         // Load user info
         await this.loadProfileInfo();
-        
+
         // Load stats
         await this.loadProfileStats();
-        
+
         // Load games
         this.profileGamesOffset = 0;
         await this.loadProfileGames(true);
@@ -1234,11 +1234,11 @@ class GameManager {
             const response = await fetch(`${this.apiUrl}/me`, {
                 credentials: 'include'
             });
-            
+
             if (response.ok) {
                 const user = await response.json();
                 this.profileEmail.textContent = user.email;
-                
+
                 if (user.created_at) {
                     const date = new Date(user.created_at);
                     this.profileJoined.textContent = date.toLocaleDateString('tr-TR');
@@ -1254,16 +1254,16 @@ class GameManager {
             const response = await fetch(`${this.apiUrl}/me/stats`, {
                 credentials: 'include'
             });
-            
+
             if (response.ok) {
                 const stats = await response.json();
                 console.log('Stats:', stats); // Debug
-                
+
                 const totalGames = parseInt(stats.total_games) || 0;
                 const wins = parseInt(stats.win_count) || 0;
                 const totalWagered = parseFloat(stats.total_bets) || 0;
                 const winRate = parseFloat(stats.win_rate) || 0;
-                
+
                 this.statTotalGames.textContent = totalGames;
                 this.statWins.textContent = wins;
                 this.statWinRate.textContent = `${winRate.toFixed(1)}%`;
@@ -1279,39 +1279,39 @@ class GameManager {
             this.profileGamesOffset = 0;
             this.profileGamesList.innerHTML = '<p class="loading-text">Yükleniyor...</p>';
         }
-        
+
         const gameType = this.gameTypeFilter.value;
         const limit = 10;
-        
+
         try {
             let url = `${this.apiUrl}/me/games?limit=${limit}&offset=${this.profileGamesOffset}`;
             if (gameType) {
                 url += `&game_type=${gameType}`;
             }
-            
+
             const response = await fetch(url, {
                 credentials: 'include'
             });
-            
+
             if (response.ok) {
                 const games = await response.json();
-                
+
                 if (reset) {
                     this.profileGamesList.innerHTML = '';
                 }
-                
+
                 if (games.length === 0 && reset) {
                     this.profileGamesList.innerHTML = '<p class="no-games-text">Henüz oyun geçmişi yok.</p>';
                     this.loadMoreGames.classList.add('hidden');
                     return;
                 }
-                
+
                 games.forEach(game => {
                     this.profileGamesList.appendChild(this.createGameRow(game));
                 });
-                
+
                 this.profileGamesOffset += games.length;
-                
+
                 // Show/hide load more button
                 if (games.length < limit) {
                     this.loadMoreGames.classList.add('hidden');
@@ -1328,29 +1328,29 @@ class GameManager {
     createGameRow(game) {
         const row = document.createElement('div');
         row.className = 'game-row';
-        
+
         const icons = {
             'coinflip': '🪙',
             'roulette': '🎡',
             'blackjack': '🃏'
         };
-        
+
         const names = {
             'coinflip': 'Coin Flip',
             'roulette': 'Roulette',
             'blackjack': 'Blackjack'
         };
-        
+
         // Parse game result
         let resultClass = 'lose';
         let resultText = '-';
         let payout = 0;
-        
+
         // Önce outcome'a bak (direkt veritabanından geliyor)
         const outcome = game.outcome;
         const winAmount = parseFloat(game.win_amount) || 0;
         const stakeAmount = parseFloat(game.stake_amount) || 0;
-        
+
         if (outcome === 'WIN') {
             resultClass = 'win';
             // Net kazanç = win_amount - stake_amount (çünkü win_amount stake dahil)
@@ -1362,10 +1362,10 @@ class GameManager {
         } else if (game.game_result) {
             // Fallback: game_result'tan parse et
             try {
-                const result = typeof game.game_result === 'string' 
-                    ? JSON.parse(game.game_result) 
+                const result = typeof game.game_result === 'string'
+                    ? JSON.parse(game.game_result)
                     : game.game_result;
-                
+
                 if (result.result === 'push') {
                     resultClass = 'push';
                     resultText = '0.00';
@@ -1383,7 +1383,7 @@ class GameManager {
         } else {
             resultText = game.status === 'COMPLETED' ? '-' : 'Devam ediyor';
         }
-        
+
         const date = game.started_at ? new Date(game.started_at).toLocaleDateString('tr-TR', {
             day: '2-digit',
             month: '2-digit',
@@ -1391,7 +1391,7 @@ class GameManager {
             hour: '2-digit',
             minute: '2-digit'
         }) : '-';
-        
+
         row.innerHTML = `
             <div class="game-row-left">
                 <span class="game-type-icon">${icons[game.game_type] || '🎮'}</span>
@@ -1405,7 +1405,7 @@ class GameManager {
                 <div class="game-stake">Bahis: ${game.stake_amount?.toFixed(2) || '0.00'}</div>
             </div>
         `;
-        
+
         return row;
     }
 

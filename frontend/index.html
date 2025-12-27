@@ -1,14 +1,18 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OddCity - Casino Games</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@700;900&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -16,7 +20,7 @@
             <h1 class="logo">OddCity</h1>
             <span class="logo-icon">🎰</span>
         </div>
-        
+
         <nav class="sidebar-nav">
             <a href="#" class="nav-item active" data-game="coinflip">
                 <span class="nav-icon">🪙</span>
@@ -33,18 +37,18 @@
             <div class="nav-divider"></div>
             <a href="#" class="nav-item" data-game="profile">
                 <span class="nav-icon">👤</span>
-                <span class="nav-text">Profil</span>
+                <span class="nav-text">Profile</span>
             </a>
         </nav>
 
         <div class="sidebar-footer">
             <div id="guestButtons" class="auth-buttons">
-                <button class="btn-auth" id="loginBtn">Giriş Yap</button>
-                <button class="btn-auth outline" id="registerBtn">Kayıt Ol</button>
+                <button class="btn-auth" id="loginBtn">Login</button>
+                <button class="btn-auth outline" id="registerBtn">Register</button>
             </div>
             <div id="userInfo" class="user-info hidden">
                 <div class="user-email" id="userEmail">user@email.com</div>
-                <button class="btn-logout" id="logoutBtn">🚪 Çıkış</button>
+                <button class="btn-logout" id="logoutBtn">🚪 Logout</button>
             </div>
         </div>
     </aside>
@@ -64,25 +68,25 @@
                     <span class="balance-currency">₿</span>
                 </div>
                 <div id="walletButtons" class="wallet-buttons hidden">
-                    <button class="btn-wallet deposit" id="depositBtn">+ Yatır</button>
-                    <button class="btn-wallet withdraw" id="withdrawBtn">- Çek</button>
+                    <button class="btn-wallet deposit" id="depositBtn">+ Deposit</button>
+                    <button class="btn-wallet withdraw" id="withdrawBtn">- Withdraw</button>
                 </div>
             </div>
         </header>
 
         <!-- Game Container -->
         <div class="game-wrapper">
-            
+
             <!-- COIN FLIP GAME -->
             <section class="game-section" id="coinflipGame">
                 <div class="game-visual">
                     <div class="coin-container">
                         <div id="coin" class="coin">
                             <div class="coin-face heads">
-                                <span>YAZI</span>
+                                <span>HEADS</span>
                             </div>
                             <div class="coin-face tails">
-                                <span>TURA</span>
+                                <span>TAILS</span>
                             </div>
                         </div>
                     </div>
@@ -95,7 +99,7 @@
 
                 <div class="game-controls" id="coinControls">
                     <div class="bet-section">
-                        <label>Bahis Miktarı</label>
+                        <label>Bet Amount</label>
                         <div class="bet-input-row">
                             <button class="bet-quick" data-amount="5">5</button>
                             <button class="bet-quick" data-amount="10">10</button>
@@ -110,24 +114,24 @@
                     </div>
 
                     <div class="choice-section">
-                        <label>Seçiminiz</label>
+                        <label>Your Choice</label>
                         <div class="choice-buttons">
                             <button class="choice-btn" data-choice="yazi">
                                 <span class="choice-icon">🪙</span>
-                                <span class="choice-name">YAZI</span>
+                                <span class="choice-name">HEADS</span>
                                 <span class="choice-multiplier">x1.95</span>
                             </button>
                             <button class="choice-btn" data-choice="tura">
                                 <span class="choice-icon">⭐</span>
-                                <span class="choice-name">TURA</span>
+                                <span class="choice-name">TAILS</span>
                                 <span class="choice-multiplier">x1.95</span>
                             </button>
                         </div>
                     </div>
 
                     <button class="play-btn" id="coinPlayBtn" disabled>
-                        <span class="play-text">🎲 OYNA</span>
-                        <span class="play-loading hidden">Atılıyor...</span>
+                        <span class="play-text">🎲 PLAY</span>
+                        <span class="play-loading hidden">Flipping...</span>
                     </button>
                 </div>
             </section>
@@ -138,7 +142,7 @@
                     <div class="roulette-strip-container">
                         <div class="strip-result-display hidden" id="stripResultDisplay">
                             <span class="result-num" id="stripResultNum">0</span>
-                            <span class="result-color" id="stripResultColor">Yeşil</span>
+                            <span class="result-color" id="stripResultColor">Green</span>
                         </div>
                         <div class="strip-pointer">▼</div>
                         <div class="roulette-strip-viewport">
@@ -158,7 +162,7 @@
 
                 <div class="game-controls" id="rouletteControls">
                     <div class="bet-section">
-                        <label>Bahis Miktarı</label>
+                        <label>Bet Amount</label>
                         <div class="bet-input-row">
                             <button class="bet-quick" data-amount="5">5</button>
                             <button class="bet-quick" data-amount="10">10</button>
@@ -172,25 +176,25 @@
                     </div>
 
                     <div class="roulette-bets">
-                        <label>Bahis Seçenekleri</label>
+                        <label>Bet Options</label>
                         <div class="bet-options">
                             <div class="bet-row colors">
                                 <button class="bet-option red" data-type="color" data-value="red">
-                                    <span>🔴 Kırmızı</span>
+                                    <span>🔴 Red</span>
                                     <span class="multiplier">x2</span>
                                 </button>
                                 <button class="bet-option black" data-type="color" data-value="black">
-                                    <span>⚫ Siyah</span>
+                                    <span>⚫ Black</span>
                                     <span class="multiplier">x2</span>
                                 </button>
                             </div>
                             <div class="bet-row parity">
                                 <button class="bet-option" data-type="parity" data-value="even">
-                                    <span>Çift</span>
+                                    <span>Even</span>
                                     <span class="multiplier">x2</span>
                                 </button>
                                 <button class="bet-option" data-type="parity" data-value="odd">
-                                    <span>Tek</span>
+                                    <span>Odd</span>
                                     <span class="multiplier">x2</span>
                                 </button>
                             </div>
@@ -200,13 +204,13 @@
                             </div>
                         </div>
                         <div class="selected-bet" id="selectedBet">
-                            Seçim yapın...
+                            Make a selection...
                         </div>
                     </div>
 
                     <button class="play-btn" id="roulettePlayBtn" disabled>
-                        <span class="play-text">🎰 ÇEVİR</span>
-                        <span class="play-loading hidden">Dönüyor...</span>
+                        <span class="play-text">🎰 SPIN</span>
+                        <span class="play-loading hidden">Spinning...</span>
                     </button>
                 </div>
             </section>
@@ -215,21 +219,21 @@
             <section class="game-section hidden" id="blackjackGame">
                 <div class="game-visual blackjack-table">
                     <div class="hand dealer-hand">
-                        <div class="hand-label">Krupiye <span class="score" id="dealerScore">?</span></div>
+                        <div class="hand-label">Dealer <span class="score" id="dealerScore">?</span></div>
                         <div class="cards" id="dealerCards"></div>
                     </div>
-                    
+
                     <div class="game-message hidden" id="bjMessage"></div>
-                    
+
                     <div class="hand player-hand">
-                        <div class="hand-label">Sen <span class="score" id="playerScore">0</span></div>
+                        <div class="hand-label">You <span class="score" id="playerScore">0</span></div>
                         <div class="cards" id="playerCards"></div>
                     </div>
                 </div>
 
                 <div class="game-controls" id="blackjackControls">
                     <div class="bet-section" id="bjBetSection">
-                        <label>Bahis Miktarı</label>
+                        <label>Bet Amount</label>
                         <div class="bet-input-row">
                             <button class="bet-quick" data-amount="5">5</button>
                             <button class="bet-quick" data-amount="10">10</button>
@@ -245,17 +249,17 @@
                     <div class="bj-actions hidden" id="bjActions">
                         <button class="action-btn hit" id="hitBtn">
                             <span class="action-icon">🎴</span>
-                            <span>Kart Çek</span>
+                            <span>Hit</span>
                         </button>
                         <button class="action-btn stand" id="standBtn">
                             <span class="action-icon">✋</span>
-                            <span>Dur</span>
+                            <span>Stand</span>
                         </button>
                     </div>
 
                     <button class="play-btn" id="bjPlayBtn">
-                        <span class="play-text">🃏 DAĞIT</span>
-                        <span class="play-loading hidden">Dağıtılıyor...</span>
+                        <span class="play-text">🃏 DEAL</span>
+                        <span class="play-loading hidden">Dealing...</span>
                     </button>
                 </div>
             </section>
@@ -267,7 +271,7 @@
                         <div class="profile-avatar">👤</div>
                         <div class="profile-info">
                             <h2 id="profileEmail">user@email.com</h2>
-                            <p class="profile-joined">Üyelik: <span id="profileJoined">-</span></p>
+                            <p class="profile-joined">Joined: <span id="profileJoined">-</span></p>
                         </div>
                     </div>
 
@@ -275,61 +279,63 @@
                         <div class="stat-card">
                             <div class="stat-icon">🎮</div>
                             <div class="stat-value" id="statTotalGames">0</div>
-                            <div class="stat-label">Toplam Oyun</div>
+                            <div class="stat-label">Total Games</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">🏆</div>
                             <div class="stat-value" id="statWins">0</div>
-                            <div class="stat-label">Kazanılan</div>
+                            <div class="stat-label">Wins</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">📊</div>
                             <div class="stat-value" id="statWinRate">0%</div>
-                            <div class="stat-label">Kazanma Oranı</div>
+                            <div class="stat-label">Win Rate</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">💰</div>
                             <div class="stat-value" id="statTotalWagered">0</div>
-                            <div class="stat-label">Toplam Bahis</div>
+                            <div class="stat-label">Total Wagered</div>
                         </div>
                     </div>
 
-                    <!-- Şifre Değiştirme -->
+                    <!-- Change Password -->
                     <div class="profile-settings">
-                        <h3>🔐 Şifre Değiştir</h3>
+                        <h3>🔐 Change Password</h3>
                         <form id="changePasswordForm" class="password-form">
                             <div class="form-row">
                                 <div class="input-group">
-                                    <label for="currentPassword">Mevcut Şifre</label>
+                                    <label for="currentPassword">Current Password</label>
                                     <input type="password" id="currentPassword" placeholder="••••••" required>
                                 </div>
                                 <div class="input-group">
-                                    <label for="newPassword">Yeni Şifre</label>
-                                    <input type="password" id="newPassword" placeholder="Min. 6 karakter" minlength="6" required>
+                                    <label for="newPassword">New Password</label>
+                                    <input type="password" id="newPassword" placeholder="Min. 6 chars" minlength="6"
+                                        required>
                                 </div>
                                 <div class="input-group">
-                                    <label for="confirmPassword">Yeni Şifre (Tekrar)</label>
-                                    <input type="password" id="confirmPassword" placeholder="••••••" minlength="6" required>
+                                    <label for="confirmPassword">Confirm New Password</label>
+                                    <input type="password" id="confirmPassword" placeholder="••••••" minlength="6"
+                                        required>
                                 </div>
                             </div>
-                            <button type="submit" class="btn-change-password">Şifreyi Değiştir</button>
+                            <button type="submit" class="btn-change-password">Change Password</button>
                         </form>
                     </div>
 
                     <div class="profile-games">
                         <div class="profile-games-header">
-                            <h3>Oyun Geçmişi</h3>
+                            <h3>Game History</h3>
                             <select id="gameTypeFilter" class="game-filter">
-                                <option value="">Tümü</option>
+                                <option value="">All</option>
                                 <option value="coinflip">Coin Flip</option>
                                 <option value="roulette">Roulette</option>
                                 <option value="blackjack">Blackjack</option>
                             </select>
                         </div>
                         <div class="games-list" id="profileGamesList">
-                            <p class="loading-text">Yükleniyor...</p>
+                            <p class="loading-text">Loading...</p>
                         </div>
-                        <button class="btn-load-more hidden" id="loadMoreGames">Daha Fazla Yükle</button>
+                        <button class="btn-load-more hidden" id="loadMoreGames">Load More</button>
                     </div>
                 </div>
             </section>
@@ -338,7 +344,7 @@
 
         <!-- Game History -->
         <div class="history-section hidden" id="historySection">
-            <h3>Son Oyunlar</h3>
+            <h3>Recent Games</h3>
             <div class="history-list" id="historyList"></div>
         </div>
     </main>
@@ -347,33 +353,34 @@
     <div class="modal hidden" id="authModal">
         <div class="modal-content">
             <button class="modal-close" id="authModalClose">×</button>
-            
+
             <div id="loginForm">
-                <h2>🔐 Giriş Yap</h2>
+                <h2>🔐 Login</h2>
                 <form id="loginFormElement">
                     <div class="input-group">
-                        <input type="email" id="loginEmail" placeholder="E-posta" required>
+                        <input type="email" id="loginEmail" placeholder="Email" required>
                     </div>
                     <div class="input-group">
-                        <input type="password" id="loginPassword" placeholder="Şifre" required>
+                        <input type="password" id="loginPassword" placeholder="Password" required>
                     </div>
-                    <button type="submit" class="btn-submit">Giriş Yap</button>
+                    <button type="submit" class="btn-submit">Login</button>
                 </form>
-                <p class="auth-switch">Hesabın yok mu? <a href="#" id="showRegister">Kayıt Ol</a></p>
+                <p class="auth-switch">Don't have an account? <a href="#" id="showRegister">Register</a></p>
             </div>
 
             <div id="registerForm" class="hidden">
-                <h2>🎮 Kayıt Ol</h2>
+                <h2>🎮 Register</h2>
                 <form id="registerFormElement">
                     <div class="input-group">
-                        <input type="email" id="registerEmail" placeholder="E-posta" required>
+                        <input type="email" id="registerEmail" placeholder="Email" required>
                     </div>
                     <div class="input-group">
-                        <input type="password" id="registerPassword" placeholder="Şifre (min 6 karakter)" required minlength="6">
+                        <input type="password" id="registerPassword" placeholder="Password (min 6 chars)" required
+                            minlength="6">
                     </div>
-                    <button type="submit" class="btn-submit">Kayıt Ol</button>
+                    <button type="submit" class="btn-submit">Register</button>
                 </form>
-                <p class="auth-switch">Hesabın var mı? <a href="#" id="showLogin">Giriş Yap</a></p>
+                <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Login</a></p>
             </div>
         </div>
     </div>
@@ -382,10 +389,10 @@
     <div class="modal hidden" id="walletModal">
         <div class="modal-content">
             <button class="modal-close" id="walletModalClose">×</button>
-            <h2 id="walletTitle">💰 Para Yatır</h2>
+            <h2 id="walletTitle">💰 Deposit Funds</h2>
             <form id="walletFormElement">
                 <div class="input-group">
-                    <input type="number" id="walletAmount" placeholder="Miktar" min="1" step="0.01" required>
+                    <input type="number" id="walletAmount" placeholder="Amount" min="1" step="0.01" required>
                     <span class="input-suffix">₿</span>
                 </div>
                 <div class="quick-amounts">
@@ -394,7 +401,7 @@
                     <button type="button" class="quick-amount" data-amount="100">100</button>
                     <button type="button" class="quick-amount" data-amount="500">500</button>
                 </div>
-                <button type="submit" class="btn-submit" id="walletSubmitBtn">Onayla</button>
+                <button type="submit" class="btn-submit" id="walletSubmitBtn">Confirm</button>
             </form>
         </div>
     </div>
@@ -409,4 +416,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>

@@ -9,17 +9,17 @@ class AdminPanel {
         this.currentPage = 'dashboard';
         this.currentPeriod = 7;
         this.csrfToken = null;
-        
+
         this.init();
     }
 
     async init() {
         // Check login status
         await this.checkAuth();
-        
+
         // Setup event listeners
         this.setupEventListeners();
-        
+
         // If logged in, load dashboard
         if (this.isLoggedIn) {
             this.loadDashboard();
@@ -84,7 +84,7 @@ class AdminPanel {
             const response = await fetch(`${this.apiUrl}/me`, {
                 credentials: 'include'
             });
-            
+
             if (response.ok) {
                 const user = await response.json();
                 if (user.is_admin) {
@@ -93,7 +93,7 @@ class AdminPanel {
                     document.getElementById('loginModal').classList.add('hidden');
                     document.getElementById('adminEmail').textContent = user.email;
                 } else {
-                    this.showNotification('Admin yetkisi gerekli!', 'error');
+                    this.showNotification('Admin privileges required!', 'error');
                     await this.logout();
                 }
             } else {
@@ -125,17 +125,17 @@ class AdminPanel {
                     await this.fetchCsrfToken();
                     document.getElementById('loginModal').classList.add('hidden');
                     document.getElementById('adminEmail').textContent = email;
-                    this.showNotification('Giriş başarılı!', 'success');
+                    this.showNotification('Login successful!', 'success');
                     this.loadDashboard();
                 } else {
-                    this.showNotification('Admin yetkisi gerekli!', 'error');
+                    this.showNotification('Admin privileges required!', 'error');
                 }
             } else {
-                this.showNotification(data.message || 'Giriş başarısız!', 'error');
+                this.showNotification(data.message || 'Login failed!', 'error');
             }
         } catch (error) {
             console.error('Login error:', error);
-            this.showNotification('Bağlantı hatası!', 'error');
+            this.showNotification('Connection error!', 'error');
         }
     }
 
@@ -149,21 +149,21 @@ class AdminPanel {
         } catch (error) {
             console.error('Logout error:', error);
         }
-        
+
         // Tüm client-side verileri temizle
         this.isLoggedIn = false;
         this.csrfToken = null;
         this.currentPage = 'dashboard';
         this.currentPeriod = 7;
-        
+
         // Dashboard verilerini temizle
         document.getElementById('totalGames').textContent = '0';
         document.getElementById('uniquePlayers').textContent = '0';
         document.getElementById('totalBets').textContent = '₿0.00';
         document.getElementById('houseProfit').textContent = '₿0.00';
-        
+
         document.getElementById('loginModal').classList.remove('hidden');
-        this.showNotification('Çıkış yapıldı', 'success');
+        this.showNotification('Logged out', 'success');
     }
 
     // ========================================
@@ -195,7 +195,7 @@ class AdminPanel {
 
     navigateTo(page) {
         this.currentPage = page;
-        
+
         // Update nav
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.toggle('active', item.dataset.page === page);
@@ -251,13 +251,13 @@ class AdminPanel {
             if (response.ok) {
                 const data = await response.json();
                 console.log('Dashboard stats:', data);
-                
+
                 // Update stat cards
                 const totalGames = data.games?.total || 0;
                 const uniquePlayers = data.games?.unique_players || 0;
                 const totalBets = data.games?.total_bets || 0;
                 const houseProfit = data.games?.house_profit || 0;
-                
+
                 document.getElementById('totalGames').textContent = totalGames.toLocaleString();
                 document.getElementById('uniquePlayers').textContent = uniquePlayers.toLocaleString();
                 document.getElementById('totalBets').textContent = `₿${totalBets.toFixed(2)}`;
@@ -267,16 +267,16 @@ class AdminPanel {
                 const winRate = parseFloat(data.games?.win_rate) || 0;
                 const winRateEl = document.getElementById('winRate');
                 const winRateCircle = document.querySelector('.win-rate-circle');
-                
+
                 if (winRateEl) {
                     winRateEl.textContent = `${winRate.toFixed(1)}%`;
                 }
                 if (winRateCircle) {
                     const degrees = winRate * 3.6;
-                    winRateCircle.style.background = 
+                    winRateCircle.style.background =
                         `conic-gradient(var(--success) ${degrees}deg, var(--bg-tertiary) ${degrees}deg)`;
                 }
-                
+
                 console.log('Win rate:', winRate);
 
                 // Update game distribution
@@ -286,17 +286,17 @@ class AdminPanel {
                 const transactions = data.transactions || [];
                 const deposits = transactions.find(t => t.tx_type === 'DEPOSIT') || { total_amount: 0 };
                 const withdraws = transactions.find(t => t.tx_type === 'WITHDRAW') || { total_amount: 0 };
-                
+
                 const totalDepositsEl = document.getElementById('totalDeposits');
                 const totalWithdrawsEl = document.getElementById('totalWithdraws');
-                
+
                 if (totalDepositsEl) {
                     totalDepositsEl.textContent = `₿${parseFloat(deposits.total_amount || 0).toFixed(2)}`;
                 }
                 if (totalWithdrawsEl) {
                     totalWithdrawsEl.textContent = `₿${parseFloat(withdraws.total_amount || 0).toFixed(2)}`;
                 }
-                
+
                 console.log('Transactions data:', transactions);
                 console.log('Deposits:', deposits, 'Withdraws:', withdraws);
             } else {
@@ -310,9 +310,9 @@ class AdminPanel {
     renderGameDistribution(gameTypes, total) {
         const container = document.getElementById('gameDistribution');
         if (!container) return;
-        
+
         console.log('Rendering game distribution:', gameTypes, 'Total:', total);
-        
+
         // Eğer veri yoksa default göster
         if (!gameTypes || gameTypes.length === 0) {
             // Default oyun tipleri göster (henüz oyun yok)
@@ -357,9 +357,9 @@ class AdminPanel {
             if (response.ok) {
                 const games = await response.json();
                 const tbody = document.getElementById('recentGamesBody');
-                
+
                 if (games.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Henüz oyun yok</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No games yet</td></tr>';
                     return;
                 }
 
@@ -388,7 +388,7 @@ class AdminPanel {
 
             if (response.ok) {
                 const data = await response.json();
-                
+
                 // Most active
                 const activeBody = document.getElementById('topPlayersBody');
                 if (data.most_active && data.most_active.length > 0) {
@@ -400,7 +400,7 @@ class AdminPanel {
                         </tr>
                     `).join('');
                 } else {
-                    activeBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary);">Veri yok</td></tr>';
+                    activeBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary);">No data</td></tr>';
                 }
 
                 // Top winners
@@ -416,7 +416,7 @@ class AdminPanel {
                         </tr>
                     `).join('');
                 } else {
-                    winnersBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary);">Veri yok</td></tr>';
+                    winnersBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary);">No data</td></tr>';
                 }
             }
         } catch (error) {
@@ -437,7 +437,7 @@ class AdminPanel {
             if (response.ok) {
                 const users = await response.json();
                 const tbody = document.getElementById('usersBody');
-                
+
                 tbody.innerHTML = users.map(user => `
                     <tr>
                         <td>#${user.user_id}</td>
@@ -449,10 +449,10 @@ class AdminPanel {
                         <td>
                             <div class="action-btns">
                                 <button class="action-btn view" onclick="adminPanel.viewUser(${user.user_id})">👁️</button>
-                                ${user.status === 'ACTIVE' 
-                                    ? `<button class="action-btn ban" onclick="adminPanel.banUser(${user.user_id})">🚫</button>`
-                                    : `<button class="action-btn unban" onclick="adminPanel.unbanUser(${user.user_id})">✅</button>`
-                                }
+                                ${user.status === 'ACTIVE'
+                        ? `<button class="action-btn ban" onclick="adminPanel.banUser(${user.user_id})">🚫</button>`
+                        : `<button class="action-btn unban" onclick="adminPanel.unbanUser(${user.user_id})">✅</button>`
+                    }
                             </div>
                         </td>
                     </tr>
@@ -479,7 +479,7 @@ class AdminPanel {
             const user = users.find(u => u.user_id === userId);
 
             if (!user) {
-                this.showNotification('Kullanıcı bulunamadı!', 'error');
+                this.showNotification('User not found!', 'error');
                 return;
             }
 
@@ -504,28 +504,28 @@ class AdminPanel {
                 
                 <div class="user-stats-grid">
                     <div class="user-stat">
-                        <div class="user-stat-label">Bakiye</div>
+                        <div class="user-stat-label">Balance</div>
                         <div class="user-stat-value">₿${parseFloat(user.balance || 0).toFixed(2)}</div>
                     </div>
                     <div class="user-stat">
-                        <div class="user-stat-label">Toplam Oyun</div>
+                        <div class="user-stat-label">Total Games</div>
                         <div class="user-stat-value">${games.length}</div>
                     </div>
                     <div class="user-stat">
-                        <div class="user-stat-label">Kazanma Oranı</div>
+                        <div class="user-stat-label">Win Rate</div>
                         <div class="user-stat-value">${games.length > 0 ? ((winCount / games.length) * 100).toFixed(1) : 0}%</div>
                     </div>
                 </div>
                 
-                <h4 style="margin: 20px 0 15px; color: var(--text-secondary);">Son Oyunlar</h4>
+                <h4 style="margin: 20px 0 15px; color: var(--text-secondary);">Recent Games</h4>
                 <div class="table-wrapper">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Oyun</th>
-                                <th>Bahis</th>
-                                <th>Kazanç</th>
-                                <th>Sonuç</th>
+                                <th>Game</th>
+                                <th>Bet</th>
+                                <th>Win</th>
+                                <th>Outcome</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -536,7 +536,7 @@ class AdminPanel {
                                     <td>₿${parseFloat(game.win_amount || 0).toFixed(2)}</td>
                                     <td><span class="status-badge ${game.outcome?.toLowerCase()}">${game.outcome || '-'}</span></td>
                                 </tr>
-                            `).join('') : '<tr><td colspan="4" style="text-align: center;">Henüz oyun yok</td></tr>'}
+                            `).join('') : '<tr><td colspan="4" style="text-align: center;">No games yet</td></tr>'}
                         </tbody>
                     </table>
                 </div>
@@ -546,12 +546,12 @@ class AdminPanel {
             document.getElementById('userDetailModal').classList.remove('hidden');
         } catch (error) {
             console.error('View user error:', error);
-            this.showNotification('Kullanıcı bilgileri yüklenemedi!', 'error');
+            this.showNotification('Could not load user details!', 'error');
         }
     }
 
     async banUser(userId) {
-        if (!confirm('Bu kullanıcıyı yasaklamak istediğinizden emin misiniz?')) return;
+        if (!confirm('Are you sure you want to ban this user?')) return;
 
         try {
             const response = await fetch(`${this.apiUrl}/admin/user/${userId}/ban`, {
@@ -561,15 +561,15 @@ class AdminPanel {
             });
 
             if (response.ok) {
-                this.showNotification('Kullanıcı yasaklandı!', 'success');
+                this.showNotification('User banned!', 'success');
                 this.loadUsers();
             } else {
                 const data = await response.json();
-                this.showNotification(data.message || 'İşlem başarısız!', 'error');
+                this.showNotification(data.message || 'Operation failed!', 'error');
             }
         } catch (error) {
             console.error('Ban user error:', error);
-            this.showNotification('Bağlantı hatası!', 'error');
+            this.showNotification('Connection error!', 'error');
         }
     }
 
@@ -582,15 +582,15 @@ class AdminPanel {
             });
 
             if (response.ok) {
-                this.showNotification('Kullanıcı yasağı kaldırıldı!', 'success');
+                this.showNotification('User unbanned!', 'success');
                 this.loadUsers();
             } else {
                 const data = await response.json();
-                this.showNotification(data.message || 'İşlem başarısız!', 'error');
+                this.showNotification(data.message || 'Operation failed!', 'error');
             }
         } catch (error) {
             console.error('Unban user error:', error);
-            this.showNotification('Bağlantı hatası!', 'error');
+            this.showNotification('Connection error!', 'error');
         }
     }
 
@@ -613,9 +613,9 @@ class AdminPanel {
             if (response.ok) {
                 const games = await response.json();
                 const tbody = document.getElementById('gamesBody');
-                
+
                 if (games.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Oyun bulunamadı</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No games found</td></tr>';
                     return;
                 }
 
@@ -653,21 +653,21 @@ class AdminPanel {
             if (response.ok) {
                 const ruleSets = await response.json();
                 console.log('Rule sets data:', ruleSets);
-                
+
                 const container = document.getElementById('rulesetsGrid');
-                
+
                 if (!ruleSets || ruleSets.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">Henüz rule set yok</p>';
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No rule sets yet</p>';
                     return;
                 }
-                
+
                 // Get rules for each rule set
-                const rulePromises = ruleSets.map(rs => 
+                const rulePromises = ruleSets.map(rs =>
                     fetch(`${this.apiUrl}/admin/rule-sets/${rs.rule_set_id}`, { credentials: 'include' })
                         .then(r => r.ok ? r.json() : { rules: [] })
                         .catch(() => ({ rules: [] }))
                 );
-                
+
                 const rulesData = await Promise.all(rulePromises);
                 console.log('Rules data:', rulesData);
 
@@ -687,14 +687,14 @@ class AdminPanel {
                     return `
                         <div class="ruleset-card ${rs.is_active ? 'active' : ''}">
                             <div class="ruleset-header">
-                                <span class="ruleset-title">${rs.name || 'İsimsiz'}</span>
+                                <span class="ruleset-title">${rs.name || 'Unnamed'}</span>
                                 <span class="ruleset-status ${rs.is_active ? 'active' : 'inactive'}">
-                                    ${rs.is_active ? '✓ AKTİF' : 'PASİF'}
+                                    ${rs.is_active ? '✓ ACTIVE' : 'INACTIVE'}
                                 </span>
                             </div>
                             <div class="ruleset-info">
-                                <p>${rs.description || 'Açıklama yok'}</p>
-                                <span class="house-edge">Ev Avantajı: ${houseEdge}%</span>
+                                <p>${rs.description || 'No description'}</p>
+                                <span class="house-edge">House Edge: ${houseEdge}%</span>
                             </div>
                             <div class="ruleset-rules">
                                 ${rules.length > 0 ? rules.map(rule => `
@@ -702,18 +702,18 @@ class AdminPanel {
                                         <span class="rule-name">${ruleNames[rule.rule_type] || rule.rule_type}</span>
                                         <span class="rule-value">${rule.rule_param}x</span>
                                     </div>
-                                `).join('') : '<p style="color: var(--text-secondary); text-align: center;">Kural yok</p>'}
+                                `).join('') : '<p style="color: var(--text-secondary); text-align: center;">No rules</p>'}
                             </div>
                             <div class="ruleset-actions">
                                 ${!rs.is_active ? `
                                     <button class="btn-success" onclick="adminPanel.activateRuleSet(${rs.rule_set_id})">
-                                        ✓ Aktif Et
+                                        ✓ Activate
                                     </button>
                                     <button class="btn-danger" onclick="adminPanel.deleteRuleSet(${rs.rule_set_id}, '${rs.name}')">
-                                        🗑️ Sil
+                                        🗑️ Delete
                                     </button>
                                 ` : `
-                                    <button class="btn-secondary" disabled>Aktif</button>
+                                    <button class="btn-secondary" disabled>Active</button>
                                 `}
                             </div>
                         </div>
@@ -740,20 +740,20 @@ class AdminPanel {
             });
 
             if (response.ok) {
-                this.showNotification('Rule set aktif edildi!', 'success');
+                this.showNotification('Rule set activated!', 'success');
                 this.loadRuleSets();
             } else {
                 const data = await response.json();
-                this.showNotification(data.message || 'İşlem başarısız!', 'error');
+                this.showNotification(data.message || 'Operation failed!', 'error');
             }
         } catch (error) {
             console.error('Activate rule set error:', error);
-            this.showNotification('Bağlantı hatası!', 'error');
+            this.showNotification('Connection error!', 'error');
         }
     }
 
     async deleteRuleSet(ruleSetId, ruleSetName) {
-        if (!confirm(`"${ruleSetName}" kural setini silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) {
+        if (!confirm(`Are you sure you want to delete rule set "${ruleSetName}"?\n\nThis action cannot be undone!`)) {
             return;
         }
 
@@ -767,14 +767,14 @@ class AdminPanel {
             const data = await response.json();
 
             if (response.ok) {
-                this.showNotification(data.message || 'Rule set silindi!', 'success');
+                this.showNotification(data.message || 'Rule set deleted!', 'success');
                 this.loadRuleSets();
             } else {
-                this.showNotification(data.message || 'Silme işlemi başarısız!', 'error');
+                this.showNotification(data.message || 'Delete failed!', 'error');
             }
         } catch (error) {
             console.error('Delete rule set error:', error);
-            this.showNotification('Bağlantı hatası!', 'error');
+            this.showNotification('Connection error!', 'error');
         }
     }
 
@@ -789,7 +789,7 @@ class AdminPanel {
         document.getElementById('rsRouletteParity').value = '1';
         document.getElementById('rsBlackjack').value = '2.5';
         document.getElementById('rsBlackjackNormal').value = '2';
-        
+
         document.getElementById('ruleSetModal').classList.remove('hidden');
     }
 
@@ -797,9 +797,9 @@ class AdminPanel {
         const name = document.getElementById('rsName').value.trim();
         const description = document.getElementById('rsDescription').value.trim();
         const houseEdge = parseFloat(document.getElementById('rsHouseEdge').value);
-        
+
         if (!name) {
-            this.showNotification('Rule set adı gereklidir!', 'error');
+            this.showNotification('Rule set name is required!', 'error');
             return;
         }
 
@@ -824,7 +824,7 @@ class AdminPanel {
 
             if (!rsResponse.ok) {
                 const data = await rsResponse.json();
-                this.showNotification(data.message || 'Rule set oluşturulamadı!', 'error');
+                this.showNotification(data.message || 'Rule set could not be created!', 'error');
                 return;
             }
 
@@ -850,12 +850,12 @@ class AdminPanel {
 
             // 3. Close modal and refresh
             document.getElementById('ruleSetModal').classList.add('hidden');
-            this.showNotification(`Rule set "${name}" oluşturuldu! (${successCount} kural eklendi)`, 'success');
+            this.showNotification(`Rule set "${name}" created! (${successCount} rules added)`, 'success');
             this.loadRuleSets();
 
         } catch (error) {
             console.error('Create rule set error:', error);
-            this.showNotification('Bağlantı hatası!', 'error');
+            this.showNotification('Connection error!', 'error');
         }
     }
 
@@ -901,10 +901,10 @@ class AdminPanel {
     showNotification(message, type = 'success') {
         const notification = document.getElementById('notification');
         const text = document.getElementById('notificationText');
-        
+
         notification.className = `notification ${type}`;
         text.textContent = message;
-        
+
         setTimeout(() => {
             notification.classList.add('hidden');
         }, 3000);

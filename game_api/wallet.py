@@ -58,7 +58,7 @@ def get_my_wallet():
     try:
         conn = get_db_connection()
         if conn is None:
-            return jsonify({'message': 'Veritabanı sunucu hatası!'}), 500
+            return jsonify({'message': 'Database server error!'}), 500
 
         cursor = conn.cursor(dictionary=True)
 
@@ -72,21 +72,21 @@ def get_my_wallet():
         wallet_info = cursor.fetchone()
 
         if not wallet_info:
-            return jsonify({'message': 'Cüzdan bulunamadı!'}), 404
+            return jsonify({'message': 'Wallet not found!'}), 404
 
         wallet_info['balance'] = float(wallet_info['balance'])
 
         return jsonify({'wallet': wallet_info}), 200
 
     except Error as e:
-        print(f"Cüzdan getirme hatası: {e}")
-        return jsonify({'message': 'Cüzdan bilgileri alınırken bir hata oluştu.'}), 500
+        print(f"Wallet fetch error: {e}")
+        return jsonify({'message': 'An error occurred while fetching wallet details.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
 
 @wallet_bp.route('/wallets/me/deposit', methods=['POST'])
-@get_limiter().limit("20 per hour")  # Saatte 20 para yatırma
+@get_limiter().limit("20 per hour")  # 20 deposits per hour
 @login_required
 @csrf_required
 def deposit_to_wallet():
@@ -156,15 +156,15 @@ def deposit_to_wallet():
 
     data = request.get_json()
     if not data or 'amount' not in data:
-        return jsonify({'message': 'Yatırılacak miktar (amount) gereklidir!'}), 400
+        return jsonify({'message': 'Amount is required!'}), 400
 
     try:
         amount = float(data['amount'])
     except ValueError:
-        return jsonify({'message': 'Miktar (amount) geçerli bir sayı olmalıdır!'}), 400
+        return jsonify({'message': 'Amount must be a valid number!'}), 400
 
     if amount <= 0:
-        return jsonify({'message': 'Miktar (amount) sıfırdan büyük olmalıdır!'}), 400
+        return jsonify({'message': 'Amount must be greater than zero!'}), 400
 
     conn = None
     cursor = None
@@ -172,28 +172,28 @@ def deposit_to_wallet():
     try:
         conn = get_db_connection()
         if conn is None:
-            return jsonify({'message': 'Veritabanı sunucu hatası!'}), 500
+            return jsonify({'message': 'Database server error!'}), 500
 
         conn.start_transaction()
 
         cursor = conn.cursor(dictionary=True)
 
-        # GÜVENLİK: Row lock ile race condition önle
+        # SECURITY: Prevent race condition with Row lock
         sql_get_wallet = "SELECT wallet_id, balance FROM wallets WHERE user_id = %s FOR UPDATE"
         cursor.execute(sql_get_wallet, (user_id,))
         wallet = cursor.fetchone()
 
         if not wallet:
             conn.rollback()
-            return jsonify({'message': 'Kullanıcıya ait cüzdan bulunamadı!'}), 404
+            return jsonify({'message': 'User wallet not found!'}), 404
 
         wallet_id = wallet['wallet_id']
 
-        # Bakiyeyi güncelle
+        # Update balance
         sql_update_wallet = "UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s"
         cursor.execute(sql_update_wallet, (amount, wallet_id))
 
-        # Yeni bakiyeyi hesapla
+        # Calculate new balance
         new_balance = float(wallet['balance']) + amount
 
         # Transaction log
@@ -203,7 +203,7 @@ def deposit_to_wallet():
         conn.commit()
 
         return jsonify({
-            'message': f'Başarılı! {amount} VIRTUAL cüzdanınıza eklendi.',
+            'message': f'Success! {amount} VIRTUAL added to your wallet.',
             'user': user_email,
             'new_balance': float(new_balance)
         }), 200
@@ -211,14 +211,14 @@ def deposit_to_wallet():
     except Error as e:
         if conn:
             conn.rollback()
-        print(f"Deposit hatası: {e}")
-        return jsonify({'message': 'Para yatırma işlemi sırasında bir hata oluştu.'}), 500
+        print(f"Deposit error: {e}")
+        return jsonify({'message': 'An error occurred during deposit.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
 
 @wallet_bp.route('/wallets/me/withdraw', methods=['POST'])
-@get_limiter().limit("10 per hour")  # Saatte 10 para çekme
+@get_limiter().limit("10 per hour")  # 10 withdrawals per hour
 @login_required
 @csrf_required
 def withdraw_from_wallet():
@@ -300,15 +300,15 @@ def withdraw_from_wallet():
 
     data = request.get_json()
     if not data or 'amount' not in data:
-        return jsonify({'message': 'Çeklecek miktar (amount) gereklidir!'}), 400
+        return jsonify({'message': 'Withdrawal amount is required!'}), 400
 
     try:
         amount = float(data['amount'])
     except ValueError:
-        return jsonify({'message': 'Miktar (amount) geçerli bir sayı olmalıdır!'}), 400
+        return jsonify({'message': 'Amount must be a valid number!'}), 400
 
     if amount <= 0:
-        return jsonify({'message': 'Miktar (amount) sıfırdan büyük olmalıdır!'}), 400
+        return jsonify({'message': 'Amount must be greater than zero!'}), 400
 
     conn = None
     cursor = None
@@ -316,7 +316,7 @@ def withdraw_from_wallet():
     try:
         conn = get_db_connection()
         if conn is None:
-            return jsonify({'message': 'Veritabanı sunucu hatası!'}), 500
+            return jsonify({'message': 'Database server error!'}), 500
 
         conn.start_transaction()
         cursor = conn.cursor(dictionary=True)
@@ -327,28 +327,28 @@ def withdraw_from_wallet():
 
         if not result:
             conn.rollback()
-            return jsonify({'message': 'Cüzdan bulunamadı!'}), 404
+            return jsonify({'message': 'Wallet not found!'}), 404
 
         balance = float(result['balance'])
 
         if balance < amount:
             conn.rollback()
             return jsonify({
-                'message': 'Yetersiz bakiye!',
+                'message': 'Insufficient balance!',
                 'current_balance': balance,
                 'withdraw_amount': amount
             }), 400
 
-        # wallet_id'yi al (SELECT FOR UPDATE ile zaten aldık)
+        # Get wallet_id (already got it with SELECT FOR UPDATE)
         cursor.execute("SELECT wallet_id FROM wallets WHERE user_id = %s", (user_id,))
         wallet = cursor.fetchone()
         wallet_id = wallet['wallet_id']
 
-        # Bakiyeyi güncelle
+        # Update balance
         sql_update_wallet = "UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s"
         cursor.execute(sql_update_wallet, (amount, wallet_id))
 
-        # Yeni bakiyeyi hesapla
+        # Calculate new balance
         new_balance = balance - amount
 
         # Transaction log
@@ -358,7 +358,7 @@ def withdraw_from_wallet():
         conn.commit()
 
         return jsonify({
-            'message': f'Başarılı! {amount} VIRTUAL cüzdanınızdan çekildi.',
+            'message': f'Success! {amount} VIRTUAL withdrawn from your wallet.',
             'user': user_email,
             'new_balance': float(new_balance)
         }), 200
@@ -366,8 +366,8 @@ def withdraw_from_wallet():
     except Error as e:
         if conn:
             conn.rollback()
-        print(f"Para Çekme hatası: {e}")
-        return jsonify({'message': 'Para çekme işlemi sırasında bir hata oluştu.'}), 500
+        print(f"Withdrawal error: {e}")
+        return jsonify({'message': 'An error occurred during withdrawal.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()

@@ -14,7 +14,7 @@ def get_limiter():
     from . import limiter
     return limiter
 
-# Varsayılan Roulette Payouts (rule system'de kural yoksa kullanılır)
+# Default Roulette Payouts (used if no rule in rule system)
 DEFAULT_PAYOUTS = {
     'number': 35,  # Straight up
     'color': 1,    # Red/Black
@@ -36,7 +36,7 @@ def get_parity(number):
     return 'even' if number % 2 == 0 else 'odd'
 
 @roulette_bp.route('/game/roulette/play', methods=['POST'])
-@get_limiter().limit("60 per minute")  # Dakikada 60 oyun
+@get_limiter().limit("60 per minute")  # 60 games per minute
 @login_required
 @csrf_required
 def play_roulette():
@@ -131,20 +131,20 @@ def play_roulette():
     data = request.get_json()
 
     if not data or 'amount' not in data or 'bet_type' not in data or 'bet_value' not in data:
-        return jsonify({'message': 'Eksik veri! (amount, bet_type, bet_value)'}), 400
+        return jsonify({'message': 'Missing data! (amount, bet_type, bet_value)'}), 400
 
     try:
         amount = float(data['amount'])
         bet_type = data['bet_type']
         bet_value = data['bet_value']
     except ValueError:
-        return jsonify({'message': 'Geçersiz veri formatı!'}), 400
+        return jsonify({'message': 'Invalid data format!'}), 400
 
     if amount <= 0:
-        return jsonify({'message': 'Bahis miktarı 0\'dan büyük olmalıdır!'}), 400
+        return jsonify({'message': 'Bet amount must be greater than 0!'}), 400
 
     if bet_type not in DEFAULT_PAYOUTS:
-        return jsonify({'message': 'Geçersiz bahis türü!'}), 400
+        return jsonify({'message': 'Invalid bet type!'}), 400
 
     # Validate bet_value based on bet_type
     if bet_type == 'number':
@@ -153,13 +153,13 @@ def play_roulette():
             if not (0 <= bet_value <= 36):
                 raise ValueError
         except ValueError:
-            return jsonify({'message': 'Geçersiz sayı! (0-36 arası olmalı)'}), 400
+            return jsonify({'message': 'Invalid number! (must be between 0-36)'}), 400
     elif bet_type == 'color':
         if bet_value not in ['red', 'black']:
-            return jsonify({'message': 'Geçersiz renk! (red veya black)'}), 400
+            return jsonify({'message': 'Invalid color! (red or black)'}), 400
     elif bet_type == 'parity':
         if bet_value not in ['odd', 'even']:
-            return jsonify({'message': 'Geçersiz tek/çift seçimi! (odd veya even)'}), 400
+            return jsonify({'message': 'Invalid odd/even selection! (odd or even)'}), 400
 
     conn = None
     cursor = None
@@ -167,7 +167,7 @@ def play_roulette():
     try:
         conn = get_db_connection()
         if conn is None:
-            return jsonify({'message': 'Veritabanı hatası!'}), 500
+            return jsonify({'message': 'Database error!'}), 500
 
         conn.start_transaction()
         cursor = conn.cursor(dictionary=True)
@@ -178,19 +178,19 @@ def play_roulette():
 
         if not wallet:
             conn.rollback()
-            return jsonify({'message': 'Cüzdan bulunamadı!'}), 404
+            return jsonify({'message': 'Wallet not found!'}), 404
 
         wallet_id = wallet['wallet_id']
         balance = float(wallet['balance'])
 
         if balance < amount:
             conn.rollback()
-            return jsonify({'message': 'Yetersiz bakiye!'}), 400
+            return jsonify({'message': 'Insufficient balance!'}), 400
 
-        # Aktif rule set ID'sini al
+        # Get active rule set ID
         rule_set_id = get_active_rule_set_id()
         
-        # Game kaydı oluştur
+        # Create game record
         sql_create_game = """
             INSERT INTO games (user_id, rule_set_id, game_type, status)
             VALUES (%s, %s, 'roulette', 'ACTIVE')
@@ -198,10 +198,10 @@ def play_roulette():
         cursor.execute(sql_create_game, (user_id, rule_set_id))
         game_id = cursor.lastrowid
 
-        # Bakiye düş
+        # Deduct balance
         cursor.execute("UPDATE wallets SET balance = balance - %s WHERE wallet_id = %s", (amount, wallet_id))
         
-        # Bet kaydı oluştur
+        # Create bet record
         sql_create_bet = """
             INSERT INTO bets (game_id, user_id, bet_type, bet_value, stake_amount)
             VALUES (%s, %s, %s, %s, %s)
@@ -222,7 +222,7 @@ def play_roulette():
         elif bet_type == 'parity':
             is_win = (bet_value == winning_parity)
         
-        # Game sonucunu kaydet
+        # Save game result
         game_result_json = json.dumps({
             'winning_number': winning_number,
             'winning_color': winning_color,
@@ -240,23 +240,23 @@ def play_roulette():
         
         payout = 0
         if is_win:
-            # Database'den payout multiplier'ı al
+            # Get payout multiplier from database
             rule_key = f'roulette_{bet_type}_payout'
             multiplier = get_active_rule_value(rule_key, DEFAULT_PAYOUTS[bet_type])
             # Original stake + profit
             payout = amount * (1 + multiplier)
             
-            # Bakiye ekle
+            # Add balance
             cursor.execute("UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s", (payout, wallet_id))
             
-            # Payout kaydı oluştur
+            # Create payout record
             sql_create_payout = """
                 INSERT INTO payouts (bet_id, win_amount, outcome)
                 VALUES (%s, %s, 'WIN')
             """
             cursor.execute(sql_create_payout, (bet_id, payout))
         else:
-            # Kayıp durumunda payout kaydı oluştur
+            # Create payout record in case of loss
             sql_create_payout = """
                 INSERT INTO payouts (bet_id, win_amount, outcome)
                 VALUES (%s, 0, 'LOSS')
@@ -270,7 +270,7 @@ def play_roulette():
         new_balance = float(cursor.fetchone()['balance'])
 
         return jsonify({
-            'message': 'KAZANDINIZ!' if is_win else 'Kaybettiniz.',
+            'message': 'YOU WON!' if is_win else 'You lost.',
             'winning_number': winning_number,
             'winning_color': winning_color,
             'is_win': is_win,
@@ -280,8 +280,8 @@ def play_roulette():
 
     except Error as e:
         if conn: conn.rollback()
-        print(f"Rulet hatası: {e}")
-        return jsonify({'message': f'Bir hata oluştu: {e}'}), 500
+        print(f"Roulette error: {e}")
+        return jsonify({'message': f'An error occurred: {e}'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()

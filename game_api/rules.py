@@ -6,7 +6,7 @@ from mysql.connector import Error
 
 rules_bp = Blueprint('rules', __name__)
 
-# Rule type'ları - Oyunlar için kullanılan rule tipleri
+# Rule types - Rule types used for games
 RULE_TYPES = {
     'coinflip_payout': 'Coin Flip Payout Multiplier',
     'roulette_number_payout': 'Roulette Number Payout',
@@ -68,7 +68,7 @@ def list_rule_sets():
         description: Admin access required
     """
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
@@ -85,7 +85,7 @@ def list_rule_sets():
         return jsonify(rule_sets), 200
     except Error as e:
         print(f"Rule sets list error: {e}")
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -160,7 +160,7 @@ def create_rule_set():
     """
     data = request.get_json()
     if not data or 'name' not in data:
-        return jsonify({'message': 'Kural seti adı (name) gereklidir!'}), 400
+        return jsonify({'message': 'Rule set name is required!'}), 400
 
     name = data['name']
     description = data.get('description')
@@ -170,7 +170,7 @@ def create_rule_set():
     cursor = None
     try:
         conn = get_db_connection()
-        if conn is None: return jsonify({'message': 'Veritabanı sunucu hatası!'}), 500
+        if conn is None: return jsonify({'message': 'Database server error!'}), 500
 
         cursor = conn.cursor()
         admin_id = session.get('user_id')
@@ -181,13 +181,13 @@ def create_rule_set():
         cursor.execute(sql, val)
         conn.commit()
 
-        return jsonify({'message': 'Kural seti başarıyla oluşturuldu!', 'rule_set_id': cursor.lastrowid}), 201
+        return jsonify({'message': 'Rule set created successfully!', 'rule_set_id': cursor.lastrowid}), 201
 
     except Error as e:
         if e.errno == 1062:
-            return jsonify({'message': 'Bu isimde bir kural seti zaten var.'}), 409
-        print(f"Rule set hatası: {e}")
-        return jsonify({'message': 'Kural seti oluşturulurken bir hata oluştu.'}), 500
+            return jsonify({'message': 'A rule set with this name already exists.'}), 409
+        print(f"Rule set error: {e}")
+        return jsonify({'message': 'An error occurred while creating the rule set.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
@@ -255,7 +255,7 @@ def get_rule_set(rule_set_id):
         description: Rule set not found
     """
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
@@ -271,9 +271,9 @@ def get_rule_set(rule_set_id):
         rule_set = cursor.fetchone()
         
         if not rule_set:
-            return jsonify({'message': 'Kural seti bulunamadı'}), 404
+            return jsonify({'message': 'Rule set not found'}), 404
         
-        # Rule set'in kuralları
+        # Rules of the rule set
         cursor.execute("""
             SELECT rule_id, rule_type, rule_param
             FROM rules
@@ -286,7 +286,7 @@ def get_rule_set(rule_set_id):
         return jsonify(rule_set), 200
     except Error as e:
         print(f"Rule set detail error: {e}")
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -348,25 +348,25 @@ def activate_rule_set(rule_set_id):
         description: Rule set not found
     """
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor()
     try:
-        # Önce tüm rule set'leri pasif yap
+        # First deactivate all rule sets
         cursor.execute("UPDATE rule_sets SET is_active = FALSE")
         
-        # Sonra bu rule set'i aktif yap
+        # Then activate this rule set
         cursor.execute("UPDATE rule_sets SET is_active = TRUE WHERE rule_set_id = %s", (rule_set_id,))
         
         if cursor.rowcount == 0:
             conn.rollback()
-            return jsonify({'message': 'Kural seti bulunamadı'}), 404
+            return jsonify({'message': 'Rule set not found'}), 404
         
         conn.commit()
-        return jsonify({'message': 'Kural seti aktif edildi.'}), 200
+        return jsonify({'message': 'Rule set activated.'}), 200
     except Error as e:
         conn.rollback()
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -427,19 +427,19 @@ def deactivate_rule_set(rule_set_id):
         description: Rule set not found
     """
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor()
     try:
         cursor.execute("UPDATE rule_sets SET is_active = FALSE WHERE rule_set_id = %s", (rule_set_id,))
         
         if cursor.rowcount == 0:
-            return jsonify({'message': 'Kural seti bulunamadı'}), 404
+            return jsonify({'message': 'Rule set not found'}), 404
         
         conn.commit()
-        return jsonify({'message': 'Kural seti pasif edildi.'}), 200
+        return jsonify({'message': 'Rule set deactivated.'}), 200
     except Error as e:
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -506,48 +506,48 @@ def delete_rule_set(rule_set_id):
     """
     conn = get_db_connection()
     if not conn: 
-        return jsonify({'message': 'Veritabanı hatası'}), 500
+        return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
-        # Rule set var mı kontrol et
+        # Check if rule set exists
         cursor.execute("SELECT rule_set_id, name, is_active FROM rule_sets WHERE rule_set_id = %s", (rule_set_id,))
         rule_set = cursor.fetchone()
         
         if not rule_set:
-            return jsonify({'message': 'Kural seti bulunamadı'}), 404
+            return jsonify({'message': 'Rule set not found'}), 404
         
-        # Aktif rule set silinmeye çalışılıyor mu?
+        # Is active rule set being deleted?
         if rule_set['is_active']:
-            return jsonify({'message': 'Aktif kural seti silinemez! Önce başka bir kural setini aktif edin.'}), 400
+            return jsonify({'message': 'Active rule set cannot be deleted! Activate another rule set first.'}), 400
         
-        # Bu rule set ile oyun oynanmış mı kontrol et
+        # Check if games have been played with this rule set
         cursor.execute("SELECT COUNT(*) as game_count FROM games WHERE rule_set_id = %s", (rule_set_id,))
         game_count = cursor.fetchone()['game_count']
         
         if game_count > 0:
             return jsonify({
-                'message': f'Bu kural seti ile {game_count} oyun oynanmış. Oyun geçmişi olan kural setleri silinemez!',
+                'message': f'{game_count} games have been played with this rule set. Rule sets with game history cannot be deleted!',
                 'game_count': game_count
             }), 400
         
-        # Önce bu rule set'e ait kuralları sil
+        # First delete rules belonging to this rule set
         cursor.execute("DELETE FROM rules WHERE rule_set_id = %s", (rule_set_id,))
         deleted_rules = cursor.rowcount
         
-        # Sonra rule set'i sil
+        # Then delete the rule set
         cursor.execute("DELETE FROM rule_sets WHERE rule_set_id = %s", (rule_set_id,))
         
         conn.commit()
         
         return jsonify({
-            'message': f'Kural seti "{rule_set["name"]}" başarıyla silindi!',
+            'message': f'Rule set "{rule_set["name"]}" deleted successfully!',
             'deleted_rules': deleted_rules
         }), 200
         
     except Error as e:
         conn.rollback()
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -631,22 +631,22 @@ def add_rule(rule_set_id):
     """
     data = request.get_json()
     if not data or 'rule_type' not in data or 'rule_param' not in data:
-        return jsonify({'message': 'rule_type ve rule_param gereklidir!'}), 400
+        return jsonify({'message': 'rule_type and rule_param are required!'}), 400
     
     rule_type = data['rule_type']
     rule_param = data['rule_param']
     
     conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
+    if not conn: return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor()
     try:
-        # Rule set'in var olduğunu kontrol et
+        # Check if rule set exists
         cursor.execute("SELECT rule_set_id FROM rule_sets WHERE rule_set_id = %s", (rule_set_id,))
         if not cursor.fetchone():
-            return jsonify({'message': 'Kural seti bulunamadı'}), 404
+            return jsonify({'message': 'Rule set not found'}), 404
         
-        # Kuralı ekle
+        # Add rule
         cursor.execute("""
             INSERT INTO rules (rule_set_id, rule_type, rule_param)
             VALUES (%s, %s, %s)
@@ -654,177 +654,14 @@ def add_rule(rule_set_id):
         
         conn.commit()
         return jsonify({
-            'message': 'Kural başarıyla eklendi!',
+            'message': 'Rule added successfully!',
             'rule_id': cursor.lastrowid
         }), 201
     except Error as e:
         conn.rollback()
         if e.errno == 1062:
-            return jsonify({'message': 'Bu rule_type için zaten bir kural var.'}), 409
-        return jsonify({'message': f'Hata: {e}'}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-@rules_bp.route('/admin/rules/<int:rule_id>', methods=['PUT'])
-@admin_required
-@csrf_required
-def update_rule(rule_id):
-    """
-    Update a rule (Admin only)
-
-    ---
-    tags:
-      - Admin Rules
-    summary: Update rule
-    description: |
-      Updates an existing rule's parameter value.
-      Requires CSRF token.
-    security:
-      - session: []
-      - admin: []
-      - csrf: []
-    consumes:
-      - application/json
-    parameters:
-      - in: path
-        name: rule_id
-        type: integer
-        required: true
-        description: Rule ID
-      - in: header
-        name: X-CSRF-Token
-        type: string
-        required: true
-        description: CSRF token
-      - in: body
-        name: body
-        required: true
-        schema:
-          type: object
-          required:
-            - rule_param
-          properties:
-            rule_param:
-              type: string
-              example: "2.0"
-              description: New rule value
-            csrf_token:
-              type: string
-    responses:
-      200:
-        description: Rule updated successfully
-        schema:
-          type: object
-          properties:
-            message:
-              type: string
-              example: Rule updated successfully!
-      400:
-        description: No update data provided
-      401:
-        description: Not authenticated
-      403:
-        description: Admin access required or invalid CSRF token
-      404:
-        description: Rule not found
-    """
-    data = request.get_json()
-    if not data:
-        return jsonify({'message': 'Güncellenecek veri gereklidir!'}), 400
-    
-    conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
-    
-    cursor = conn.cursor()
-    try:
-        # Güncellenebilir alanlar
-        updates = []
-        values = []
-        
-        if 'rule_param' in data:
-            updates.append("rule_param = %s")
-            values.append(data['rule_param'])
-        
-        if not updates:
-            return jsonify({'message': 'Güncellenecek alan belirtilmedi!'}), 400
-        
-        values.append(rule_id)
-        query = f"UPDATE rules SET {', '.join(updates)} WHERE rule_id = %s"
-        cursor.execute(query, values)
-        
-        if cursor.rowcount == 0:
-            return jsonify({'message': 'Kural bulunamadı'}), 404
-        
-        conn.commit()
-        return jsonify({'message': 'Kural başarıyla güncellendi!'}), 200
-    except Error as e:
-        conn.rollback()
-        return jsonify({'message': f'Hata: {e}'}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-@rules_bp.route('/admin/rules/<int:rule_id>', methods=['DELETE'])
-@admin_required
-@csrf_required
-def delete_rule(rule_id):
-    """
-    Delete a rule (Admin only)
-
-    ---
-    tags:
-      - Admin Rules
-    summary: Delete rule
-    description: |
-      Deletes a rule from a rule set.
-      Requires CSRF token.
-    security:
-      - session: []
-      - admin: []
-      - csrf: []
-    parameters:
-      - in: path
-        name: rule_id
-        type: integer
-        required: true
-        description: Rule ID to delete
-      - in: header
-        name: X-CSRF-Token
-        type: string
-        required: true
-        description: CSRF token
-    responses:
-      200:
-        description: Rule deleted successfully
-        schema:
-          type: object
-          properties:
-            message:
-              type: string
-              example: Rule deleted successfully!
-      401:
-        description: Not authenticated
-      403:
-        description: Admin access required or invalid CSRF token
-      404:
-        description: Rule not found
-    """
-    conn = get_db_connection()
-    if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
-    
-    cursor = conn.cursor()
-    try:
-        cursor.execute("DELETE FROM rules WHERE rule_id = %s", (rule_id,))
-        
-        if cursor.rowcount == 0:
-            return jsonify({'message': 'Kural bulunamadı'}), 404
-        
-        conn.commit()
-        return jsonify({'message': 'Kural başarıyla silindi!'}), 200
-    except Error as e:
-        conn.rollback()
-        return jsonify({'message': f'Hata: {e}'}), 500
+            return jsonify({'message': 'A rule already exists for this rule_type.'}), 409
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()

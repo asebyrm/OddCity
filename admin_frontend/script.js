@@ -30,14 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.is_admin) {
                     checkAuth(); // Refresh UI
                 } else {
-                    alert('Bu hesap admin yetkisine sahip değil!');
+                    alert('This account does not have admin privileges!');
                 }
             } else {
                 alert(data.message);
             }
         } catch (error) {
             console.error('Login error:', error);
-            alert('Giriş hatası.');
+            alert('Login error.');
         }
     });
 
@@ -96,11 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${user.is_admin ? '✅' : '❌'}</td>
                 <td>${new Date(user.created_at).toLocaleDateString()}</td>
                 <td>
-                    <button class="action-btn btn-history" data-userid="${user.user_id}">Geçmiş</button>
+                    <button class="action-btn btn-history" data-userid="${user.user_id}">History</button>
                     ${!user.is_admin ? `
                         ${user.status === 'ACTIVE'
-                        ? `<button class="action-btn btn-ban" data-userid="${user.user_id}" data-action="ban">Yasakla</button>`
-                        : `<button class="action-btn btn-unban" data-userid="${user.user_id}" data-action="unban">Yasağı Kaldır</button>`
+                        ? `<button class="action-btn btn-ban" data-userid="${user.user_id}" data-action="ban">Ban</button>`
+                        : `<button class="action-btn btn-unban" data-userid="${user.user_id}" data-action="unban">Unban</button>`
                     }
                     ` : ''}
                 </td>
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function toggleBan(userId, action) {
-        if (!confirm(`Bu kullanıcıyı ${action === 'ban' ? 'yasaklamak' : 'yasağını kaldırmak'} istediğinize emin misiniz?`)) return;
+        if (!confirm(`Are you sure you want to ${action === 'ban' ? 'ban' : 'unban'} this user?`)) return;
 
         try {
             const response = await fetch(`/admin/user/${userId}/${action}`, { method: 'POST' });
@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             checkAuth(); // Refresh list
         } catch (error) {
             console.error('Error:', error);
-            alert('İşlem başarısız.');
+            alert('Operation failed.');
         }
     }
 
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             historyList.innerHTML = '';
             if (history.length === 0) {
-                historyList.innerHTML = '<p>İşlem geçmişi yok.</p>';
+                historyList.innerHTML = '<p>No transaction history.</p>';
             } else {
                 history.forEach(item => {
                     const div = document.createElement('div');
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
             historyModal.classList.remove('hidden');
         } catch (error) {
             console.error('Error:', error);
-            alert('Geçmiş yüklenemedi.');
+            alert('Could not load history.');
         }
     }
 });

@@ -8,7 +8,7 @@ from mysql.connector import Error
 
 auth_bp = Blueprint('auth', __name__)
 
-# Rate limiter import (circular import önlemek için lazy import)
+# Rate limiter import (lazy import to prevent circular import)
 def get_limiter():
     from . import limiter
     return limiter
@@ -18,7 +18,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            return jsonify({'message': 'Bu işlemi yapmak için giriş yapmalısınız.'}), 401
+            return jsonify({'message': 'You must log in to perform this action.'}), 401
         return f(*args, **kwargs)
 
     return decorated_function
@@ -29,14 +29,14 @@ def admin_required(f):
     @login_required
     def decorated_function(*args, **kwargs):
         if not session.get('is_admin'):
-            return jsonify({'message': 'Bu işlemi yapmak için admin yetkisi gerekli!'}), 403
+            return jsonify({'message': 'Admin privileges are required for this action!'}), 403
         return f(*args, **kwargs)
 
     return decorated_function
 
 
 @auth_bp.route('/register', methods=['POST'])
-@get_limiter().limit("5 per hour")  # Saatte 5 kayıt (spam koruması)
+@get_limiter().limit("5 per hour")  # 5 registrations per hour (spam protection)
 def register_user():
     """
     Register a new user account
@@ -91,7 +91,7 @@ def register_user():
     
     data = request.get_json()
     if not data or 'email' not in data or 'password' not in data:
-        return jsonify({'message': 'E-posta ve şifre gereklidir!'}), 400
+        return jsonify({'message': 'Email and password are required!'}), 400
     
     email = data['email']
     password = data['password']
@@ -110,7 +110,7 @@ def register_user():
     cursor = None
     try:
         conn = get_db_connection()
-        if conn is None: return jsonify({'message': 'Veritabanı sunucu hatası!'}), 500
+        if conn is None: return jsonify({'message': 'Database server error!'}), 500
         cursor = conn.cursor()
         sql_insert_user = "INSERT INTO users (email, password_hash) VALUES (%s, %s)"
         user_val = (email, hashed_password)
@@ -119,18 +119,18 @@ def register_user():
         sql_insert_wallet = "INSERT INTO wallets (user_id) VALUES (%s)"
         cursor.execute(sql_insert_wallet, (new_user_id,))
         conn.commit()
-        return jsonify({'message': 'Kullanıcı ve cüzdanı başarıyla oluşturuldu!', 'user_id': new_user_id}), 201
+        return jsonify({'message': 'User and wallet created successfully!', 'user_id': new_user_id}), 201
     except Error as e:
-        if e.errno == 1062: return jsonify({'message': 'Bu e-posta adresi zaten kullanılıyor.'}), 409
-        print(f"Kayıt hatası: {e}")
-        return jsonify({'message': 'Kayıt işlemi sırasında bir hata oluştu. Lütfen tekrar deneyin.'}), 500
+        if e.errno == 1062: return jsonify({'message': 'This email address is already in use.'}), 409
+        print(f"Registration error: {e}")
+        return jsonify({'message': 'An error occurred during registration. Please try again.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
 
 
 @auth_bp.route('/login', methods=['POST'])
-@get_limiter().limit("10 per minute")  # Dakikada 10 deneme (brute force koruması)
+@get_limiter().limit("10 per minute")  # 10 attempts per minute (brute force protection)
 def login_user():
     """
     User login endpoint (Session-based authentication)
@@ -173,14 +173,14 @@ def login_user():
     
     data = request.get_json()
     if not data or 'email' not in data or 'password' not in data:
-        return jsonify({'message': 'E-posta ve şifre gereklidir!'}), 400
+        return jsonify({'message': 'Email and password are required!'}), 400
     email = data['email']
     password = data['password']
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
-        if conn is None: return jsonify({'message': 'Veritabanı sunucu hatası!'}), 500
+        if conn is None: return jsonify({'message': 'Database server error!'}), 500
         cursor = conn.cursor(dictionary=True)
         sql = "SELECT user_id, email, password_hash, is_admin, status FROM users WHERE email = %s"
         cursor.execute(sql, (email,))
@@ -188,7 +188,7 @@ def login_user():
 
         if user and check_password_hash(user['password_hash'], password):
             if user['status'] == 'BANNED':
-                return jsonify({'message': 'Hesabınız yasaklanmıştır.'}), 403
+                return jsonify({'message': 'Your account has been banned.'}), 403
 
             session['user_id'] = user['user_id']
             session['email'] = user['email']
@@ -209,7 +209,7 @@ def login_user():
             active_game = cursor.fetchone()
             
             response_data = {
-                'message': 'Giris basarili!',
+                'message': 'Login successful!',
                 'email': user['email'],
                 'is_admin': bool(user['is_admin']),
                 'balance': balance
@@ -223,7 +223,7 @@ def login_user():
                     'started_at': active_game['started_at'].isoformat() if active_game['started_at'] else None
                 }
             
-            # Login log kaydı
+            # Login log record
             ip_address = request.remote_addr
             cursor.execute(
                 "INSERT INTO logs (user_id, action_type, ip_address) VALUES (%s, 'LOGIN', %s)",
@@ -233,10 +233,10 @@ def login_user():
             
             return jsonify(response_data), 200
         else:
-            return jsonify({'message': 'Geçersiz e-posta veya şifre!'}), 401
+            return jsonify({'message': 'Invalid email or password!'}), 401
     except Error as e:
-        print(f"Giriş hatası: {e}")
-        return jsonify({'message': 'Giriş işlemi sırasında bir hata oluştu. Lütfen tekrar deneyin.'}), 500
+        print(f"Login error: {e}")
+        return jsonify({'message': 'An error occurred during login. Please try again.'}), 500
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
@@ -292,7 +292,7 @@ def logout_user():
     """
     user_id = session.get('user_id')
     
-    # Logout log kaydı
+    # Logout log record
     try:
         conn = get_db_connection()
         if conn:
@@ -306,10 +306,10 @@ def logout_user():
             cursor.close()
             conn.close()
     except Error:
-        pass  # Log hatası kritik değil
+        pass  # Log error is not critical
     
     session.clear()
-    return jsonify({'message': 'Başarıyla çıkış yapıldı.'}), 200
+    return jsonify({'message': 'Logged out successfully.'}), 200
 
 
 @auth_bp.route('/csrf-token', methods=['GET'])
@@ -392,7 +392,7 @@ def get_current_user():
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'message': 'Veritabanı hatası'}), 500
+        return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
@@ -405,7 +405,7 @@ def get_current_user():
         
         user = cursor.fetchone()
         if not user:
-            return jsonify({'message': 'Kullanıcı bulunamadı'}), 404
+            return jsonify({'message': 'User not found'}), 404
         
         if user['balance']:
             user['balance'] = float(user['balance'])
@@ -413,7 +413,7 @@ def get_current_user():
         return jsonify(user)
         
     except Error as e:
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
@@ -617,30 +617,30 @@ def change_password():
     data = request.get_json()
     
     if not data or 'current_password' not in data or 'new_password' not in data:
-        return jsonify({'message': 'Mevcut şifre ve yeni şifre gereklidir!'}), 400
+        return jsonify({'message': 'Current password and new password are required!'}), 400
     
     current_password = data['current_password']
     new_password = data['new_password']
     
-    # Yeni şifre validasyonu
+    # New password validation
     is_valid, error = validate_password(new_password)
     if not is_valid:
         return jsonify({'message': error}), 400
     
     conn = get_db_connection()
     if not conn:
-        return jsonify({'message': 'Veritabanı hatası'}), 500
+        return jsonify({'message': 'Database error'}), 500
     
     cursor = conn.cursor(dictionary=True)
     try:
-        # Mevcut şifreyi kontrol et
+        # Check current password
         cursor.execute("SELECT password_hash FROM users WHERE user_id = %s", (user_id,))
         user = cursor.fetchone()
         
         if not user or not check_password_hash(user['password_hash'], current_password):
-            return jsonify({'message': 'Mevcut şifre yanlış!'}), 401
+            return jsonify({'message': 'Incorrect current password!'}), 401
         
-        # Yeni şifreyi hashle ve güncelle
+        # Hash new password and update
         new_hash = generate_password_hash(new_password)
         cursor.execute(
             "UPDATE users SET password_hash = %s WHERE user_id = %s",
@@ -648,11 +648,11 @@ def change_password():
         )
         conn.commit()
         
-        return jsonify({'message': 'Şifre başarıyla değiştirildi!'})
+        return jsonify({'message': 'Password changed successfully!'})
         
     except Error as e:
         conn.rollback()
-        return jsonify({'message': f'Hata: {e}'}), 500
+        return jsonify({'message': f'Error: {e}'}), 500
     finally:
         cursor.close()
         conn.close()
