@@ -3,18 +3,103 @@ import json
 from flask import jsonify, request, Blueprint, session
 from .database import get_db_connection
 from .auth import login_required
-from .rules import get_active_rule_value, get_active_rule_set_id, create_rule_snapshot
+from .rules import get_active_rule_value, get_active_rule_set_id
+from .utils.csrf import csrf_required
 from mysql.connector import Error
 
 coinflip_bp = Blueprint('coinflip', __name__)
+
+# Rate limiter
+def get_limiter():
+    from . import limiter
+    return limiter
 
 # Varsayılan payout multiplier (rule system'de kural yoksa kullanılır)
 DEFAULT_PAYOUT_MULTIPLIER = 1.95
 
 @coinflip_bp.route('/game/coinflip/play', methods=['POST'])
+@get_limiter().limit("60 per minute")  # Dakikada 60 oyun
 @login_required
+@csrf_required
 def play_coinflip():
-    """Yazı-Tura oyunu"""
+    """
+    Play a coinflip game
+
+    ---
+    tags:
+      - Games
+    summary: Play Coinflip
+    description: |
+      Places a bet on heads (yazi) or tails (tura).
+      The result is randomly determined and payout is based on active rule set.
+      Requires CSRF token.
+    security:
+      - session: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - amount
+            - choice
+          properties:
+            amount:
+              type: number
+              format: float
+              minimum: 0.01
+              example: 10.00
+              description: Bet amount
+            choice:
+              type: string
+              enum: [yazi, tura]
+              example: yazi
+              description: "Your choice - yazi (heads) or tura (tails)"
+            csrf_token:
+              type: string
+              description: Alternative way to provide CSRF token
+    responses:
+      200:
+        description: Game completed
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Congratulations, YOU WON! (19.50)"
+            your_choice:
+              type: string
+              example: yazi
+            result:
+              type: string
+              example: yazi
+            is_win:
+              type: boolean
+              example: true
+            payout:
+              type: number
+              example: 19.50
+            new_balance:
+              type: number
+              example: 509.50
+      400:
+        description: Invalid bet amount or choice
+      401:
+        description: Not authenticated
+      403:
+        description: Insufficient balance or invalid CSRF token
+      404:
+        description: Wallet not found
+    """
     user_id = session.get('user_id')
     data = request.get_json()
 
@@ -90,9 +175,6 @@ def play_coinflip():
         is_win = (choice == game_result)
 
         new_balance = 0.0
-
-        # Rule snapshot oluştur (oyun oynandığında kullanılan rule değerlerini kaydet)
-        create_rule_snapshot(game_id, rule_set_id, 'coinflip')
         
         # Game sonucunu kaydet
         game_result_json = json.dumps({'result': game_result, 'choice': choice, 'is_win': is_win})
@@ -163,12 +245,3 @@ def play_coinflip():
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
-
-
-# Eski endpoint'i koruyalım (geriye dönük uyumluluk için)
-@coinflip_bp.route('/game/play', methods=['POST'])
-@login_required
-def play_game_legacy():
-    """Eski endpoint - geriye dönük uyumluluk için"""
-    return play_coinflip()
-

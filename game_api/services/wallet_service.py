@@ -153,12 +153,14 @@ class WalletService:
             conn.start_transaction()
             cursor = conn.cursor(dictionary=True)
             
-            wallet = WalletService.get_wallet(user_id, cursor)
+            # GÜVENLİK: Row lock ile race condition önle
+            wallet = WalletService.get_wallet(user_id, cursor, for_update=True)
             if not wallet:
                 conn.rollback()
                 return {'success': False, 'message': 'Cüzdan bulunamadı'}
             
             wallet_id = wallet['wallet_id']
+            old_balance = wallet['balance']
             
             # Para ekle
             WalletService.credit(wallet_id, amount, cursor)

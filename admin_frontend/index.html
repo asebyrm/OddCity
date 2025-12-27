@@ -246,7 +246,10 @@
 
             <!-- Rule Sets Page -->
             <section class="page hidden" id="page-rulesets">
-                <h2 class="page-title">Rule Set Yönetimi</h2>
+                <div class="page-header">
+                    <h2 class="page-title">Rule Set Yönetimi</h2>
+                    <button class="btn-primary" id="newRuleSetBtn">➕ Yeni Rule Set</button>
+                </div>
                 
                 <div class="rulesets-grid" id="rulesetsGrid">
                     <!-- JS ile doldurulacak -->
@@ -297,6 +300,82 @@
             <button class="modal-close" onclick="closeUserModal()">×</button>
             <h2>👤 Kullanıcı Detayı</h2>
             <div id="userDetailContent"></div>
+        </div>
+    </div>
+
+    <!-- New Rule Set Modal -->
+    <div class="modal hidden" id="ruleSetModal">
+        <div class="modal-content large">
+            <button class="modal-close" onclick="closeRuleSetModal()">×</button>
+            <h2>⚙️ Yeni Rule Set Oluştur</h2>
+            <form id="ruleSetForm">
+                <div class="form-section">
+                    <h3>Genel Bilgiler</h3>
+                    <div class="form-group">
+                        <label for="rsName">Rule Set Adı *</label>
+                        <input type="text" id="rsName" placeholder="Örn: Yüksek Ödeme Modu" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="rsDescription">Açıklama</label>
+                        <textarea id="rsDescription" placeholder="Bu rule set hakkında kısa bir açıklama..." rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="rsHouseEdge">Ev Avantajı (%)</label>
+                        <input type="number" id="rsHouseEdge" value="5" min="0" max="50" step="0.1">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>🪙 Coin Flip</h3>
+                    <div class="form-group">
+                        <label for="rsCoinflip">Payout Çarpanı</label>
+                        <input type="number" id="rsCoinflip" value="1.95" min="1" max="5" step="0.01">
+                        <small>Varsayılan: 1.95x (Kazanınca bahis × 1.95)</small>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>🎰 Roulette</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rsRouletteNumber">Sayı Payout</label>
+                            <input type="number" id="rsRouletteNumber" value="35" min="1" max="50" step="1">
+                            <small>Tek sayıya bahis (35:1)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="rsRouletteColor">Renk Payout</label>
+                            <input type="number" id="rsRouletteColor" value="1" min="0.5" max="3" step="0.01">
+                            <small>Kırmızı/Siyah (1:1)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="rsRouletteParity">Tek/Çift Payout</label>
+                            <input type="number" id="rsRouletteParity" value="1" min="0.5" max="3" step="0.01">
+                            <small>Tek/Çift (1:1)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>🃏 Blackjack</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rsBlackjack">Blackjack Payout</label>
+                            <input type="number" id="rsBlackjack" value="2.5" min="1" max="5" step="0.1">
+                            <small>21 ile kazanma (3:2 = 2.5x)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="rsBlackjackNormal">Normal Kazanç</label>
+                            <input type="number" id="rsBlackjackNormal" value="2" min="1" max="4" step="0.1">
+                            <small>Normal kazanma (1:1 = 2x)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeRuleSetModal()">İptal</button>
+                    <button type="submit" class="btn-primary">💾 Kaydet</button>
+                </div>
+            </form>
         </div>
     </div>
 

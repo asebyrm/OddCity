@@ -61,8 +61,6 @@ def init_db():
             rule_set_id INTEGER NOT NULL,
             rule_type VARCHAR(50) NOT NULL,
             rule_param VARCHAR(100),
-            priority INTEGER NOT NULL DEFAULT 0,
-            is_required BOOLEAN NOT NULL DEFAULT TRUE,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (rule_set_id) REFERENCES rule_sets(rule_set_id)
         );
@@ -102,20 +100,7 @@ def init_db():
             win_amount DECIMAL(10,2) NOT NULL,
             outcome VARCHAR(10) NOT NULL CHECK (outcome IN ('WIN','LOSS')),
             paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            payout_tx_id INTEGER,
             FOREIGN KEY (bet_id) REFERENCES bets(bet_id)
-        );
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS game_rule_snapshots (
-            snapshot_id INTEGER PRIMARY KEY AUTO_INCREMENT,
-            game_id INTEGER NOT NULL,
-            rule_set_id INTEGER NOT NULL,
-            rule_type VARCHAR(50) NOT NULL,
-            rule_value DECIMAL(10,2) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (game_id) REFERENCES games(game_id),
-            FOREIGN KEY (rule_set_id) REFERENCES rule_sets(rule_set_id)
         );
         """,
         """
@@ -168,8 +153,6 @@ def init_db():
         # Rule sets tablosu index'leri
         "CREATE INDEX IF NOT EXISTS idx_rule_sets_is_active ON rule_sets(is_active)",
         
-        # Game rule snapshots index'leri
-        "CREATE INDEX IF NOT EXISTS idx_snapshots_game_id ON game_rule_snapshots(game_id)",
         
         # Transactions tablosu index'leri
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)",
@@ -323,8 +306,8 @@ def create_default_rules(conn, cursor, admin_id):
             # Kuralları ekle
             for rule_type, rule_param in rule_set['rules']:
                 cursor.execute("""
-                    INSERT INTO rules (rule_set_id, rule_type, rule_param, priority, is_required)
-                    VALUES (%s, %s, %s, 0, TRUE)
+                    INSERT INTO rules (rule_set_id, rule_type, rule_param)
+                    VALUES (%s, %s, %s)
                 """, (rule_set_id, rule_type, rule_param))
             
             created_count += 1

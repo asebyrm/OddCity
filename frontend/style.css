@@ -1533,6 +1533,80 @@ body {
     letter-spacing: 1px;
 }
 
+/* Profile Settings - Password Change */
+.profile-settings {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 25px;
+    margin-bottom: 25px;
+}
+
+.profile-settings h3 {
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border);
+}
+
+.password-form .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.password-form .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.password-form .input-group label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.password-form .input-group input {
+    padding: 12px 15px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.password-form .input-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+}
+
+.btn-change-password {
+    padding: 12px 30px;
+    background: linear-gradient(135deg, var(--accent), #0099cc);
+    color: var(--bg-primary);
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-change-password:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(0, 212, 255, 0.3);
+}
+
+.btn-change-password:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .profile-games {
     background: var(--bg-card);
     border: 1px solid var(--border);

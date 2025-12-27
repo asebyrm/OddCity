@@ -3,7 +3,7 @@ Game Service - Tüm oyun işlemlerini yönetir
 """
 import json
 from ..database import get_db_connection
-from ..rules import get_active_rule_set_id, get_active_rule_value, create_rule_snapshot
+from ..rules import get_active_rule_set_id, get_active_rule_value
 from ..utils.logger import game_logger
 from .wallet_service import WalletService
 from mysql.connector import Error
@@ -148,13 +148,10 @@ class GameService:
             # 4. Bet oluştur
             bet_id = GameService.create_bet(game_id, user_id, bet_type, str(bet_value), bet_amount, cursor)
             
-            # 5. Rule snapshot oluştur
-            create_rule_snapshot(game_id, rule_set_id, game_type)
-            
-            # 6. Oyunu tamamla
+            # 5. Oyunu tamamla
             GameService.complete_game(game_id, game_result, cursor)
             
-            # 7. Payout işle
+            # 6. Payout işle
             if is_win:
                 WalletService.credit(wallet_id, payout_amount, cursor)
                 GameService.create_payout(bet_id, payout_amount, 'WIN', cursor)
@@ -163,7 +160,7 @@ class GameService:
             
             conn.commit()
             
-            # 8. Yeni bakiyeyi al
+            # 7. Yeni bakiyeyi al
             new_balance = WalletService.get_balance(wallet_id, cursor)
             
             # Log

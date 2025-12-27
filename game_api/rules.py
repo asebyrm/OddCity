@@ -1,6 +1,7 @@
 from flask import jsonify, request, Blueprint, session
 from .database import get_db_connection
 from .auth import admin_required
+from .utils.csrf import csrf_required
 from mysql.connector import Error
 
 rules_bp = Blueprint('rules', __name__)
@@ -20,7 +21,52 @@ RULE_TYPES = {
 @rules_bp.route('/admin/rule-sets', methods=['GET'])
 @admin_required
 def list_rule_sets():
-    """Tüm rule set'leri listele"""
+    """
+    List all rule sets (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: List rule sets
+    description: Returns all rule sets with their details.
+    security:
+      - session: []
+      - admin: []
+    responses:
+      200:
+        description: Rule sets retrieved successfully
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              rule_set_id:
+                type: integer
+                example: 1
+              name:
+                type: string
+                example: Default Rules
+              description:
+                type: string
+              house_edge:
+                type: number
+                example: 5.0
+              is_active:
+                type: boolean
+              start_at:
+                type: string
+                format: date-time
+              end_at:
+                type: string
+                format: date-time
+              created_by:
+                type: string
+                example: admin@example.com
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -46,8 +92,72 @@ def list_rule_sets():
 
 @rules_bp.route('/admin/rule-sets', methods=['POST'])
 @admin_required
+@csrf_required
 def create_rule_set():
-    """Yeni rule set oluştur"""
+    """
+    Create a new rule set (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: Create rule set
+    description: |
+      Creates a new rule set for game configurations.
+      New rule sets are created as inactive by default.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - name
+          properties:
+            name:
+              type: string
+              example: High Stakes Rules
+            description:
+              type: string
+              example: Rules for high roller games
+            house_edge:
+              type: number
+              default: 5.0
+              example: 3.5
+            csrf_token:
+              type: string
+    responses:
+      201:
+        description: Rule set created successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Rule set created successfully!
+            rule_set_id:
+              type: integer
+              example: 2
+      400:
+        description: Missing name
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+      409:
+        description: Rule set name already exists
+    """
     data = request.get_json()
     if not data or 'name' not in data:
         return jsonify({'message': 'Kural seti adı (name) gereklidir!'}), 400
@@ -65,7 +175,7 @@ def create_rule_set():
         cursor = conn.cursor()
         admin_id = session.get('user_id')
         
-        sql = "INSERT INTO rule_sets (name, description, house_edge, created_by_admin_id) VALUES (%s, %s, %s, %s)"
+        sql = "INSERT INTO rule_sets (name, description, house_edge, created_by_admin_id, is_active) VALUES (%s, %s, %s, %s, FALSE)"
         val = (name, description, house_edge, admin_id)
 
         cursor.execute(sql, val)
@@ -85,7 +195,65 @@ def create_rule_set():
 @rules_bp.route('/admin/rule-sets/<int:rule_set_id>', methods=['GET'])
 @admin_required
 def get_rule_set(rule_set_id):
-    """Rule set detaylarını ve kurallarını getir"""
+    """
+    Get rule set details (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: Get rule set details
+    description: Returns a rule set with all its rules.
+    security:
+      - session: []
+      - admin: []
+    parameters:
+      - in: path
+        name: rule_set_id
+        type: integer
+        required: true
+        description: Rule set ID
+    responses:
+      200:
+        description: Rule set retrieved successfully
+        schema:
+          type: object
+          properties:
+            rule_set_id:
+              type: integer
+            name:
+              type: string
+            description:
+              type: string
+            house_edge:
+              type: number
+            is_active:
+              type: boolean
+            start_at:
+              type: string
+              format: date-time
+            end_at:
+              type: string
+              format: date-time
+            created_by:
+              type: string
+            rules:
+              type: array
+              items:
+                type: object
+                properties:
+                  rule_id:
+                    type: integer
+                  rule_type:
+                    type: string
+                  rule_param:
+                    type: string
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
+      404:
+        description: Rule set not found
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -107,10 +275,10 @@ def get_rule_set(rule_set_id):
         
         # Rule set'in kuralları
         cursor.execute("""
-            SELECT rule_id, rule_type, rule_param, priority, is_required
+            SELECT rule_id, rule_type, rule_param
             FROM rules
             WHERE rule_set_id = %s
-            ORDER BY priority DESC, rule_id ASC
+            ORDER BY rule_id ASC
         """, (rule_set_id,))
         rules = cursor.fetchall()
         
@@ -125,8 +293,60 @@ def get_rule_set(rule_set_id):
 
 @rules_bp.route('/admin/rule-sets/<int:rule_set_id>/activate', methods=['POST'])
 @admin_required
+@csrf_required
 def activate_rule_set(rule_set_id):
-    """Rule set'i aktif yap (diğerlerini pasif yap)"""
+    """
+    Activate a rule set (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: Activate rule set
+    description: |
+      Activates a rule set and deactivates all others.
+      Only one rule set can be active at a time.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: path
+        name: rule_set_id
+        type: integer
+        required: true
+        description: Rule set ID to activate
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+    responses:
+      200:
+        description: Rule set activated successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Rule set activated.
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+      404:
+        description: Rule set not found
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -153,8 +373,59 @@ def activate_rule_set(rule_set_id):
 
 @rules_bp.route('/admin/rule-sets/<int:rule_set_id>/deactivate', methods=['POST'])
 @admin_required
+@csrf_required
 def deactivate_rule_set(rule_set_id):
-    """Rule set'i pasif yap"""
+    """
+    Deactivate a rule set (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: Deactivate rule set
+    description: |
+      Deactivates a rule set.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: path
+        name: rule_set_id
+        type: integer
+        required: true
+        description: Rule set ID to deactivate
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+    responses:
+      200:
+        description: Rule set deactivated successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Rule set deactivated.
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+      404:
+        description: Rule set not found
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -173,20 +444,197 @@ def deactivate_rule_set(rule_set_id):
         cursor.close()
         conn.close()
 
+
+@rules_bp.route('/admin/rule-sets/<int:rule_set_id>', methods=['DELETE'])
+@admin_required
+@csrf_required
+def delete_rule_set(rule_set_id):
+    """
+    Delete a rule set (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: Delete rule set
+    description: |
+      Deletes a rule set permanently.
+      Only rule sets with no games played can be deleted.
+      Active rule sets cannot be deleted.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    parameters:
+      - in: path
+        name: rule_set_id
+        type: integer
+        required: true
+        description: Rule set ID to delete
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+    responses:
+      200:
+        description: Rule set deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Rule set "Test Rules" deleted successfully!
+            deleted_rules:
+              type: integer
+              example: 5
+      400:
+        description: Cannot delete active rule set or rule set has games
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            game_count:
+              type: integer
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+      404:
+        description: Rule set not found
+    """
+    conn = get_db_connection()
+    if not conn: 
+        return jsonify({'message': 'Veritabanı hatası'}), 500
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Rule set var mı kontrol et
+        cursor.execute("SELECT rule_set_id, name, is_active FROM rule_sets WHERE rule_set_id = %s", (rule_set_id,))
+        rule_set = cursor.fetchone()
+        
+        if not rule_set:
+            return jsonify({'message': 'Kural seti bulunamadı'}), 404
+        
+        # Aktif rule set silinmeye çalışılıyor mu?
+        if rule_set['is_active']:
+            return jsonify({'message': 'Aktif kural seti silinemez! Önce başka bir kural setini aktif edin.'}), 400
+        
+        # Bu rule set ile oyun oynanmış mı kontrol et
+        cursor.execute("SELECT COUNT(*) as game_count FROM games WHERE rule_set_id = %s", (rule_set_id,))
+        game_count = cursor.fetchone()['game_count']
+        
+        if game_count > 0:
+            return jsonify({
+                'message': f'Bu kural seti ile {game_count} oyun oynanmış. Oyun geçmişi olan kural setleri silinemez!',
+                'game_count': game_count
+            }), 400
+        
+        # Önce bu rule set'e ait kuralları sil
+        cursor.execute("DELETE FROM rules WHERE rule_set_id = %s", (rule_set_id,))
+        deleted_rules = cursor.rowcount
+        
+        # Sonra rule set'i sil
+        cursor.execute("DELETE FROM rule_sets WHERE rule_set_id = %s", (rule_set_id,))
+        
+        conn.commit()
+        
+        return jsonify({
+            'message': f'Kural seti "{rule_set["name"]}" başarıyla silindi!',
+            'deleted_rules': deleted_rules
+        }), 200
+        
+    except Error as e:
+        conn.rollback()
+        return jsonify({'message': f'Hata: {e}'}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
 # Rule Yönetimi
 
 @rules_bp.route('/admin/rule-sets/<int:rule_set_id>/rules', methods=['POST'])
 @admin_required
+@csrf_required
 def add_rule(rule_set_id):
-    """Rule set'e yeni kural ekle"""
+    """
+    Add a rule to a rule set (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: Add rule to rule set
+    description: |
+      Adds a new rule to an existing rule set.
+      Each rule_type can only exist once per rule set.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: path
+        name: rule_set_id
+        type: integer
+        required: true
+        description: Rule set ID
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - rule_type
+            - rule_param
+          properties:
+            rule_type:
+              type: string
+              enum: [coinflip_payout, roulette_number_payout, roulette_color_payout, roulette_parity_payout, blackjack_payout, blackjack_normal_payout]
+              example: coinflip_payout
+            rule_param:
+              type: string
+              example: "1.95"
+              description: Rule value (as string)
+            csrf_token:
+              type: string
+    responses:
+      201:
+        description: Rule created successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Rule added successfully!
+            rule_id:
+              type: integer
+              example: 10
+      400:
+        description: Missing required fields
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+      404:
+        description: Rule set not found
+      409:
+        description: Rule type already exists in this rule set
+    """
     data = request.get_json()
     if not data or 'rule_type' not in data or 'rule_param' not in data:
         return jsonify({'message': 'rule_type ve rule_param gereklidir!'}), 400
     
     rule_type = data['rule_type']
     rule_param = data['rule_param']
-    priority = data.get('priority', 0)
-    is_required = data.get('is_required', True)
     
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
@@ -200,9 +648,9 @@ def add_rule(rule_set_id):
         
         # Kuralı ekle
         cursor.execute("""
-            INSERT INTO rules (rule_set_id, rule_type, rule_param, priority, is_required)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (rule_set_id, rule_type, rule_param, priority, is_required))
+            INSERT INTO rules (rule_set_id, rule_type, rule_param)
+            VALUES (%s, %s, %s)
+        """, (rule_set_id, rule_type, rule_param))
         
         conn.commit()
         return jsonify({
@@ -220,8 +668,67 @@ def add_rule(rule_set_id):
 
 @rules_bp.route('/admin/rules/<int:rule_id>', methods=['PUT'])
 @admin_required
+@csrf_required
 def update_rule(rule_id):
-    """Kuralı güncelle"""
+    """
+    Update a rule (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: Update rule
+    description: |
+      Updates an existing rule's parameter value.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: path
+        name: rule_id
+        type: integer
+        required: true
+        description: Rule ID
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - rule_param
+          properties:
+            rule_param:
+              type: string
+              example: "2.0"
+              description: New rule value
+            csrf_token:
+              type: string
+    responses:
+      200:
+        description: Rule updated successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Rule updated successfully!
+      400:
+        description: No update data provided
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+      404:
+        description: Rule not found
+    """
     data = request.get_json()
     if not data:
         return jsonify({'message': 'Güncellenecek veri gereklidir!'}), 400
@@ -238,14 +745,6 @@ def update_rule(rule_id):
         if 'rule_param' in data:
             updates.append("rule_param = %s")
             values.append(data['rule_param'])
-        
-        if 'priority' in data:
-            updates.append("priority = %s")
-            values.append(data['priority'])
-        
-        if 'is_required' in data:
-            updates.append("is_required = %s")
-            values.append(data['is_required'])
         
         if not updates:
             return jsonify({'message': 'Güncellenecek alan belirtilmedi!'}), 400
@@ -268,8 +767,49 @@ def update_rule(rule_id):
 
 @rules_bp.route('/admin/rules/<int:rule_id>', methods=['DELETE'])
 @admin_required
+@csrf_required
 def delete_rule(rule_id):
-    """Kuralı sil"""
+    """
+    Delete a rule (Admin only)
+
+    ---
+    tags:
+      - Admin Rules
+    summary: Delete rule
+    description: |
+      Deletes a rule from a rule set.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    parameters:
+      - in: path
+        name: rule_id
+        type: integer
+        required: true
+        description: Rule ID to delete
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+    responses:
+      200:
+        description: Rule deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Rule deleted successfully!
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+      404:
+        description: Rule not found
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -292,21 +832,47 @@ def delete_rule(rule_id):
 @rules_bp.route('/admin/rule-types', methods=['GET'])
 @admin_required
 def get_rule_types():
-    """Kullanılabilir rule type'ları listele"""
-    return jsonify(RULE_TYPES), 200
+    """
+    Get available rule types (Admin only)
 
-@rules_bp.route('/games/<int:game_id>/rules', methods=['GET'])
-@admin_required
-def get_game_rules_endpoint(game_id):
-    """Bir oyunun hangi rule'larla oynandığını getir"""
-    from .rules import get_game_rules
-    
-    rules_data = get_game_rules(game_id)
-    
-    if not rules_data:
-        return jsonify({'message': 'Bu oyun için rule snapshot bulunamadı'}), 404
-    
-    return jsonify(rules_data), 200
+    ---
+    tags:
+      - Admin Rules
+    summary: Get rule types
+    description: Returns a list of all available rule types that can be used in rule sets.
+    security:
+      - session: []
+      - admin: []
+    responses:
+      200:
+        description: Rule types retrieved successfully
+        schema:
+          type: object
+          properties:
+            coinflip_payout:
+              type: string
+              example: Coin Flip Payout Multiplier
+            roulette_number_payout:
+              type: string
+              example: Roulette Number Payout
+            roulette_color_payout:
+              type: string
+              example: Roulette Color Payout
+            roulette_parity_payout:
+              type: string
+              example: Roulette Parity Payout
+            blackjack_payout:
+              type: string
+              example: "Blackjack Payout (3:2)"
+            blackjack_normal_payout:
+              type: string
+              example: Blackjack Normal Win Payout
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
+    """
+    return jsonify(RULE_TYPES), 200
 
 def get_active_rule_set_id():
     """Aktif rule set'in ID'sini döndürür"""
@@ -349,7 +915,6 @@ def get_active_rule_value(rule_type, default_value):
             FROM rules r
             JOIN rule_sets rs ON r.rule_set_id = rs.rule_set_id
             WHERE rs.is_active = TRUE AND r.rule_type = %s
-            ORDER BY r.priority DESC
             LIMIT 1
         """
         cursor.execute(query, (rule_type,))
@@ -368,116 +933,4 @@ def get_active_rule_value(rule_type, default_value):
     finally:
         cursor.close()
         conn.close()
-
-def create_rule_snapshot(game_id, rule_set_id, game_type):
-    """
-    Oyun için rule snapshot oluştur - Oyun oynandığında kullanılan rule değerlerini kaydet
     
-    Args:
-        game_id: Oyun ID'si
-        rule_set_id: Kullanılan rule set ID'si
-        game_type: Oyun tipi ('coinflip', 'roulette', 'blackjack')
-    """
-    conn = get_db_connection()
-    if not conn:
-        print("Rule snapshot oluşturulamadı: Veritabanı bağlantısı yok")
-        return
-    
-    cursor = conn.cursor()
-    try:
-        # Oyun tipine göre rule'ları belirle
-        rules_to_snapshot = []
-        
-        if game_type == 'coinflip':
-            payout = get_active_rule_value('coinflip_payout', 1.95)
-            rules_to_snapshot.append(('coinflip_payout', payout))
-        
-        elif game_type == 'roulette':
-            number_payout = get_active_rule_value('roulette_number_payout', 35)
-            color_payout = get_active_rule_value('roulette_color_payout', 1)
-            parity_payout = get_active_rule_value('roulette_parity_payout', 1)
-            rules_to_snapshot.extend([
-                ('roulette_number_payout', number_payout),
-                ('roulette_color_payout', color_payout),
-                ('roulette_parity_payout', parity_payout)
-            ])
-        
-        elif game_type == 'blackjack':
-            blackjack_payout = get_active_rule_value('blackjack_payout', 2.5)
-            normal_payout = get_active_rule_value('blackjack_normal_payout', 2.0)
-            rules_to_snapshot.extend([
-                ('blackjack_payout', blackjack_payout),
-                ('blackjack_normal_payout', normal_payout)
-            ])
-        
-        # Snapshot'ları kaydet
-        for rule_type, rule_value in rules_to_snapshot:
-            cursor.execute("""
-                INSERT INTO game_rule_snapshots (game_id, rule_set_id, rule_type, rule_value)
-                VALUES (%s, %s, %s, %s)
-            """, (game_id, rule_set_id, rule_type, rule_value))
-        
-        conn.commit()
-        
-    except Error as e:
-        print(f"Rule snapshot oluşturma hatası: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
-        conn.close()
-
-def get_game_rules(game_id):
-    """
-    Bir oyunun hangi rule'larla oynandığını getir
-    
-    Returns:
-        {
-            'rule_set_id': 1,
-            'rules': [
-                {'rule_type': 'coinflip_payout', 'rule_value': 1.95},
-                ...
-            ]
-        }
-    """
-    conn = get_db_connection()
-    if not conn:
-        return None
-    
-    cursor = conn.cursor(dictionary=True)
-    try:
-        # Snapshot'ları getir
-        cursor.execute("""
-            SELECT rule_set_id, rule_type, rule_value
-            FROM game_rule_snapshots
-            WHERE game_id = %s
-            ORDER BY rule_type
-        """, (game_id,))
-        
-        snapshots = cursor.fetchall()
-        
-        if not snapshots:
-            return None
-        
-        # İlk snapshot'tan rule_set_id'yi al
-        rule_set_id = snapshots[0]['rule_set_id']
-        
-        # Rule'ları formatla
-        rules = [
-            {
-                'rule_type': s['rule_type'],
-                'rule_value': float(s['rule_value'])
-            }
-            for s in snapshots
-        ]
-        
-        return {
-            'rule_set_id': rule_set_id,
-            'rules': rules
-        }
-        
-    except Error as e:
-        print(f"Game rules getirme hatası: {e}")
-        return None
-    finally:
-        cursor.close()
-        conn.close()

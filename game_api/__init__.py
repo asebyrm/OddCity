@@ -1,17 +1,87 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_session import Session
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flasgger import Swagger
+
 from .config import Config
+
+# Global limiter instance
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    CORS(app, supports_credentials=True, origins=["file://", "http://localhost:*", "http://127.0.0.1:*"])
+    CORS(
+        app,
+        supports_credentials=True,
+        origins=["file://", "http://localhost:*", "http://127.0.0.1:*"]
+    )
 
+    # ======================
+    # Session
+    # ======================
     Session(app)
 
+    # ======================
+    # Swagger (Flasgger)
+    # ======================
+    swagger_template = {
+        "swagger": "2.0",
+        "info": {
+            "title": "Casino Game API",
+            "description": "Session-based authentication + CSRF protected API",
+            "version": "1.0.0"
+        },
+        "securityDefinitions": {
+            "sessionAuth": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "session"
+            }
+        }
+    }
+
+    swagger_config = {
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": "apispec",
+                "route": "/apispec.json",
+                "rule_filter": lambda rule: True,
+                "model_filter": lambda tag: True,
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/apidocs/",
+    }
+
+    Swagger(app, template=swagger_template, config=swagger_config)
+
+    # ======================
+    # Rate Limiter
+    # ======================
+    limiter.init_app(app)
+
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return jsonify({
+            'message': 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyin.',
+            'error': 'rate_limit_exceeded',
+            'retry_after': e.description
+        }), 429
+
+    # ======================
+    # Blueprints
+    # ======================
     from .auth import auth_bp
     app.register_blueprint(auth_bp)
 
@@ -33,9 +103,15 @@ def create_app():
     from .admin import admin_bp
     app.register_blueprint(admin_bp)
 
+    # ======================
+    # DB Init
+    # ======================
     from .database import init_db
     init_db()
 
+    # ======================
+    # Frontend Routes
+    # ======================
     from .frontend_routes import frontend_bp, admin_fe_bp
     app.register_blueprint(admin_fe_bp)
     app.register_blueprint(frontend_bp)

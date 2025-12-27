@@ -9,6 +9,7 @@ class GameManager {
         this.balance = 0;
         this.activeGame = 'coinflip';
         this.gameHistory = [];
+        this.csrfToken = null;
 
         this.init();
     }
@@ -227,6 +228,7 @@ class GameManager {
         try {
             await fetch(`${this.apiUrl}/logout`, {
                 method: 'POST',
+                headers: this.getSecureHeaders(),
                 credentials: 'include'
             });
         } catch (error) {
@@ -234,6 +236,7 @@ class GameManager {
         }
 
         this.currentUser = null;
+        this.csrfToken = null;
         this.onLogout();
         this.showNotification('Çıkış yapıldı', 'success');
     }
@@ -244,6 +247,9 @@ class GameManager {
         this.walletButtons.classList.remove('hidden');
         this.historySection.classList.remove('hidden');
         this.userEmail.textContent = user.email;
+        
+        // CSRF token al
+        await this.fetchCsrfToken();
         
         // Eğer user objesinde balance varsa direkt kullan, yoksa fetch et
         if (user.balance !== undefined && user.balance !== null) {
@@ -297,6 +303,7 @@ class GameManager {
             try {
                 const response = await fetch(`${this.apiUrl}/game/blackjack/resume`, {
                     method: 'POST',
+                    headers: this.getSecureHeaders(),
                     credentials: 'include'
                 });
                 
@@ -335,7 +342,59 @@ class GameManager {
         this.historySection.classList.add('hidden');
         this.balanceValue.textContent = '0.00';
         this.balance = 0;
+        
+        // Tüm oyun verilerini temizle
+        this.gameHistory = [];
+        this.historyList.innerHTML = '';
+        
+        // Blackjack state temizle
+        this.bjGameActive = false;
+        if (this.dealerCards) this.dealerCards.innerHTML = '';
+        if (this.playerCards) this.playerCards.innerHTML = '';
+        if (this.dealerScore) this.dealerScore.textContent = '?';
+        if (this.playerScore) this.playerScore.textContent = '0';
+        if (this.bjMessage) this.bjMessage.classList.add('hidden');
+        if (this.bjActions) this.bjActions.classList.add('hidden');
+        if (this.bjBetSection) this.bjBetSection.classList.remove('hidden');
+        if (this.bjPlayBtn) this.bjPlayBtn.classList.remove('hidden');
+        
+        // Coinflip & Roulette seçimlerini temizle
+        this.coinChoice = null;
+        this.rouletteBet = null;
+        if (this.selectedBet) this.selectedBet.textContent = 'Seçim yapın...';
+        
+        // Sonuç alanlarını gizle
+        if (this.coinResult) this.coinResult.classList.add('hidden');
+        if (this.rouletteResult) this.rouletteResult.classList.add('hidden');
+        
         this.disableGameControls();
+    }
+
+    // ========================================
+    // CSRF Token Methods
+    // ========================================
+
+    async fetchCsrfToken() {
+        try {
+            const response = await fetch(`${this.apiUrl}/csrf-token`, {
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.csrfToken = data.csrf_token;
+            }
+        } catch (error) {
+            console.error('CSRF token fetch error:', error);
+        }
+    }
+
+    getSecureHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.csrfToken) {
+            headers['X-CSRF-Token'] = this.csrfToken;
+        }
+        return headers;
     }
 
     // ========================================
@@ -382,7 +441,7 @@ class GameManager {
         try {
             const response = await fetch(`${this.apiUrl}${endpoint}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getSecureHeaders(),
                 credentials: 'include',
                 body: JSON.stringify({ amount })
             });
@@ -521,7 +580,7 @@ class GameManager {
         try {
             const response = await fetch(`${this.apiUrl}/game/coinflip/play`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getSecureHeaders(),
                 credentials: 'include',
                 body: JSON.stringify({ choice: this.coinChoice, amount: amount })
             });
@@ -710,7 +769,7 @@ class GameManager {
         try {
             const response = await fetch(`${this.apiUrl}/game/roulette/play`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getSecureHeaders(),
                 credentials: 'include',
                 body: JSON.stringify({
                     bet_type: this.rouletteBet.type,
@@ -888,7 +947,7 @@ class GameManager {
         try {
             const response = await fetch(`${this.apiUrl}/game/blackjack/start`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getSecureHeaders(),
                 credentials: 'include',
                 body: JSON.stringify({ amount: amount })
             });
@@ -924,6 +983,7 @@ class GameManager {
         try {
             const response = await fetch(`${this.apiUrl}/game/blackjack/hit`, {
                 method: 'POST',
+                headers: this.getSecureHeaders(),
                 credentials: 'include'
             });
 
@@ -949,6 +1009,7 @@ class GameManager {
         try {
             const response = await fetch(`${this.apiUrl}/game/blackjack/stand`, {
                 method: 'POST',
+                headers: this.getSecureHeaders(),
                 credentials: 'include'
             });
 
@@ -1087,6 +1148,71 @@ class GameManager {
                 this.loadProfileGames(false);
             });
         }
+
+        // Password change form
+        const changePasswordForm = document.getElementById('changePasswordForm');
+        if (changePasswordForm) {
+            changePasswordForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.changePassword();
+            });
+        }
+    }
+
+    async changePassword() {
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        // Validasyon
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            this.showNotification('Tüm alanları doldurun!', 'error');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            this.showNotification('Yeni şifre en az 6 karakter olmalı!', 'error');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            this.showNotification('Yeni şifreler eşleşmiyor!', 'error');
+            return;
+        }
+
+        const btn = document.querySelector('.btn-change-password');
+        btn.disabled = true;
+        btn.textContent = 'Değiştiriliyor...';
+
+        try {
+            const response = await fetch(`${this.apiUrl}/me/password`, {
+                method: 'PUT',
+                headers: this.getSecureHeaders(),
+                credentials: 'include',
+                body: JSON.stringify({
+                    current_password: currentPassword,
+                    new_password: newPassword
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showNotification('Şifre başarıyla değiştirildi!', 'success');
+                // Formu temizle
+                document.getElementById('currentPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+            } else {
+                this.showNotification(data.message || 'Şifre değiştirilemedi!', 'error');
+            }
+        } catch (error) {
+            console.error('Password change error:', error);
+            this.showNotification('Bağlantı hatası!', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Şifreyi Değiştir';
+        }
     }
 
     async loadProfile() {
@@ -1220,25 +1346,42 @@ class GameManager {
         let resultText = '-';
         let payout = 0;
         
-        if (game.game_result) {
+        // Önce outcome'a bak (direkt veritabanından geliyor)
+        const outcome = game.outcome;
+        const winAmount = parseFloat(game.win_amount) || 0;
+        const stakeAmount = parseFloat(game.stake_amount) || 0;
+        
+        if (outcome === 'WIN') {
+            resultClass = 'win';
+            // Net kazanç = win_amount - stake_amount (çünkü win_amount stake dahil)
+            const netWin = winAmount - stakeAmount;
+            resultText = `+${netWin.toFixed(2)}`;
+        } else if (outcome === 'LOSS') {
+            resultClass = 'lose';
+            resultText = `-${stakeAmount.toFixed(2)}`;
+        } else if (game.game_result) {
+            // Fallback: game_result'tan parse et
             try {
                 const result = typeof game.game_result === 'string' 
                     ? JSON.parse(game.game_result) 
                     : game.game_result;
                 
-                if (result.is_win || result.result === 'win' || result.result === 'blackjack') {
-                    resultClass = 'win';
-                    payout = result.payout || 0;
-                    resultText = `+${payout.toFixed(2)}`;
-                } else if (result.result === 'push') {
+                if (result.result === 'push') {
                     resultClass = 'push';
                     resultText = '0.00';
+                } else if (result.is_win || result.result === 'win' || result.result === 'blackjack') {
+                    resultClass = 'win';
+                    const payout = result.payout || winAmount || 0;
+                    const netWin = payout - stakeAmount;
+                    resultText = `+${netWin.toFixed(2)}`;
                 } else {
-                    resultText = `-${game.stake_amount?.toFixed(2) || '0.00'}`;
+                    resultText = `-${stakeAmount.toFixed(2)}`;
                 }
             } catch (e) {
                 resultText = game.status === 'COMPLETED' ? '-' : 'Devam ediyor';
             }
+        } else {
+            resultText = game.status === 'COMPLETED' ? '-' : 'Devam ediyor';
         }
         
         const date = game.started_at ? new Date(game.started_at).toLocaleDateString('tr-TR', {

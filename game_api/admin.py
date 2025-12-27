@@ -3,6 +3,7 @@ from .database import get_db_connection
 from .auth import admin_required
 from .services.game_service import GameService
 from .utils.logger import admin_logger
+from .utils.csrf import csrf_required
 from mysql.connector import Error
 
 admin_bp = Blueprint('admin', __name__)
@@ -10,6 +11,46 @@ admin_bp = Blueprint('admin', __name__)
 @admin_bp.route('/admin/users', methods=['GET'])
 @admin_required
 def list_users():
+    """
+    List all users (Admin only)
+
+    ---
+    tags:
+      - Admin
+    summary: List all users
+    description: Returns a list of all users with their wallet balances.
+    security:
+      - session: []
+      - admin: []
+    responses:
+      200:
+        description: Users retrieved successfully
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id:
+                type: integer
+              email:
+                type: string
+              status:
+                type: string
+                enum: [ACTIVE, BANNED]
+              is_admin:
+                type: boolean
+              created_at:
+                type: string
+                format: date-time
+              balance:
+                type: number
+              currency:
+                type: string
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -32,7 +73,61 @@ def list_users():
 
 @admin_bp.route('/admin/user/<int:user_id>/ban', methods=['POST'])
 @admin_required
+@csrf_required
 def ban_user(user_id):
+    """
+    Ban a user (Admin only)
+
+    ---
+    tags:
+      - Admin
+    summary: Ban user
+    description: |
+      Bans a user account, preventing login.
+      Admin users cannot be banned.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: path
+        name: user_id
+        type: integer
+        required: true
+        description: User ID to ban
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+              description: Alternative way to provide CSRF token
+    responses:
+      200:
+        description: User banned successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: User banned.
+      400:
+        description: Cannot ban admin users
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -55,7 +150,57 @@ def ban_user(user_id):
 
 @admin_bp.route('/admin/user/<int:user_id>/unban', methods=['POST'])
 @admin_required
+@csrf_required
 def unban_user(user_id):
+    """
+    Unban a user (Admin only)
+
+    ---
+    tags:
+      - Admin
+    summary: Unban user
+    description: |
+      Removes ban from a user account, allowing login again.
+      Requires CSRF token.
+    security:
+      - session: []
+      - admin: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: path
+        name: user_id
+        type: integer
+        required: true
+        description: User ID to unban
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+    responses:
+      200:
+        description: User unbanned successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: User ban removed.
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required or invalid CSRF token
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -73,6 +218,48 @@ def unban_user(user_id):
 @admin_bp.route('/admin/user/<int:user_id>/history', methods=['GET'])
 @admin_required
 def user_history(user_id):
+    """
+    Get user transaction history (Admin only)
+
+    ---
+    tags:
+      - Admin
+    summary: Get user transaction history
+    description: Returns the last 50 transactions for a specific user.
+    security:
+      - session: []
+      - admin: []
+    parameters:
+      - in: path
+        name: user_id
+        type: integer
+        required: true
+        description: User ID to get history for
+    responses:
+      200:
+        description: Transaction history retrieved successfully
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              transaction_id:
+                type: integer
+              amount:
+                type: number
+              tx_type:
+                type: string
+                enum: [DEPOSIT, WITHDRAW]
+              created_at:
+                type: string
+                format: date-time
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
+      404:
+        description: User wallet not found
+    """
     conn = get_db_connection()
     if not conn: return jsonify({'message': 'Veritabanı hatası'}), 500
     
@@ -109,7 +296,80 @@ def user_history(user_id):
 @admin_required
 def dashboard_stats():
     """
-    Admin dashboard için genel istatistikler
+    Get dashboard statistics (Admin only)
+
+    ---
+    tags:
+      - Admin Dashboard
+    summary: Get dashboard statistics
+    description: |
+      Returns comprehensive statistics for the admin dashboard including
+      game stats, user counts, wallet totals, and transaction summaries.
+    security:
+      - session: []
+      - admin: []
+    parameters:
+      - in: query
+        name: days
+        type: integer
+        default: 30
+        description: Number of days to include in statistics
+    responses:
+      200:
+        description: Statistics retrieved successfully
+        schema:
+          type: object
+          properties:
+            period_days:
+              type: integer
+              example: 30
+            games:
+              type: object
+              properties:
+                total:
+                  type: integer
+                unique_players:
+                  type: integer
+                total_bets:
+                  type: number
+                total_payouts:
+                  type: number
+                house_profit:
+                  type: number
+                win_rate:
+                  type: number
+                by_type:
+                  type: array
+                  items:
+                    type: object
+            users:
+              type: object
+              properties:
+                total:
+                  type: integer
+                active:
+                  type: integer
+                banned:
+                  type: integer
+                admins:
+                  type: integer
+            wallets:
+              type: object
+              properties:
+                total_balance:
+                  type: number
+            transactions:
+              type: array
+              items:
+                type: object
+            rule_sets:
+              type: array
+              items:
+                type: object
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
     """
     days = request.args.get('days', 30, type=int)
     
@@ -148,7 +408,27 @@ def dashboard_stats():
             AND g.started_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
             GROUP BY game_type
         """, (days,))
-        game_type_stats = cursor.fetchall()
+        game_type_stats_raw = cursor.fetchall()
+        
+        # Format and ensure all game types are present
+        game_types_map = {}
+        for gt in game_type_stats_raw:
+            game_types_map[gt['game_type']] = {
+                'game_type': gt['game_type'],
+                'count': int(gt['count'] or 0),
+                'total_bets': float(gt['total_bets'] or 0)
+            }
+        
+        # Ensure all three game types are represented
+        for game_type in ['coinflip', 'roulette', 'blackjack']:
+            if game_type not in game_types_map:
+                game_types_map[game_type] = {
+                    'game_type': game_type,
+                    'count': 0,
+                    'total_bets': 0
+                }
+        
+        game_type_stats = list(game_types_map.values())
         
         # Kullanıcı istatistikleri
         cursor.execute("""
@@ -175,7 +455,27 @@ def dashboard_stats():
             WHERE created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
             GROUP BY tx_type
         """, (days,))
-        tx_stats = cursor.fetchall()
+        tx_stats_raw = cursor.fetchall()
+        
+        # Ensure we always have DEPOSIT and WITHDRAW entries
+        tx_stats = []
+        deposit_found = False
+        withdraw_found = False
+        for tx in tx_stats_raw:
+            tx_stats.append({
+                'tx_type': tx['tx_type'],
+                'count': int(tx['count'] or 0),
+                'total_amount': float(tx['total_amount'] or 0)
+            })
+            if tx['tx_type'] == 'DEPOSIT':
+                deposit_found = True
+            if tx['tx_type'] == 'WITHDRAW':
+                withdraw_found = True
+        
+        if not deposit_found:
+            tx_stats.append({'tx_type': 'DEPOSIT', 'count': 0, 'total_amount': 0})
+        if not withdraw_found:
+            tx_stats.append({'tx_type': 'WITHDRAW', 'count': 0, 'total_amount': 0})
         
         # Rule set istatistikleri
         cursor.execute("""
@@ -236,7 +536,62 @@ def dashboard_stats():
 @admin_required
 def recent_games():
     """
-    Son oynanan oyunlar
+    Get recent games (Admin only)
+
+    ---
+    tags:
+      - Admin Dashboard
+    summary: Get recent games
+    description: Returns the most recently completed games.
+    security:
+      - session: []
+      - admin: []
+    parameters:
+      - in: query
+        name: limit
+        type: integer
+        default: 20
+        description: Maximum number of games to return
+      - in: query
+        name: game_type
+        type: string
+        enum: [coinflip, roulette, blackjack]
+        description: Filter by game type
+    responses:
+      200:
+        description: Recent games retrieved successfully
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              game_id:
+                type: integer
+              game_type:
+                type: string
+              game_result:
+                type: object
+              started_at:
+                type: string
+                format: date-time
+              ended_at:
+                type: string
+                format: date-time
+              player_email:
+                type: string
+              rule_set_name:
+                type: string
+              stake_amount:
+                type: number
+              win_amount:
+                type: number
+              outcome:
+                type: string
+                enum: [WIN, LOSS]
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
     """
     limit = request.args.get('limit', 20, type=int)
     game_type = request.args.get('game_type')
@@ -297,7 +652,76 @@ def recent_games():
 @admin_required
 def top_players():
     """
-    En çok oynayan ve en çok kazanan oyuncular
+    Get top players (Admin only)
+
+    ---
+    tags:
+      - Admin Dashboard
+    summary: Get top players
+    description: |
+      Returns rankings of players by activity and winnings.
+      Includes most active, top winners, and top losers.
+    security:
+      - session: []
+      - admin: []
+    parameters:
+      - in: query
+        name: days
+        type: integer
+        default: 30
+        description: Number of days to include
+      - in: query
+        name: limit
+        type: integer
+        default: 10
+        description: Maximum players per category
+    responses:
+      200:
+        description: Top players retrieved successfully
+        schema:
+          type: object
+          properties:
+            period_days:
+              type: integer
+            most_active:
+              type: array
+              items:
+                type: object
+                properties:
+                  user_id:
+                    type: integer
+                  email:
+                    type: string
+                  game_count:
+                    type: integer
+                  total_bets:
+                    type: number
+            top_winners:
+              type: array
+              items:
+                type: object
+                properties:
+                  user_id:
+                    type: integer
+                  email:
+                    type: string
+                  net_profit:
+                    type: number
+            top_losers:
+              type: array
+              items:
+                type: object
+                properties:
+                  user_id:
+                    type: integer
+                  email:
+                    type: string
+                  net_loss:
+                    type: number
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
     """
     days = request.args.get('days', 30, type=int)
     limit = request.args.get('limit', 10, type=int)
@@ -388,7 +812,64 @@ def top_players():
 @admin_required
 def user_games(user_id):
     """
-    Belirli bir kullanıcının oyun geçmişi
+    Get a user's game history (Admin only)
+
+    ---
+    tags:
+      - Admin
+    summary: Get user's game history
+    description: Returns a paginated list of games for a specific user.
+    security:
+      - session: []
+      - admin: []
+    parameters:
+      - in: path
+        name: user_id
+        type: integer
+        required: true
+        description: User ID to get games for
+      - in: query
+        name: limit
+        type: integer
+        default: 50
+        description: Maximum number of games to return
+      - in: query
+        name: offset
+        type: integer
+        default: 0
+        description: Number of games to skip
+      - in: query
+        name: game_type
+        type: string
+        enum: [coinflip, roulette, blackjack]
+        description: Filter by game type
+    responses:
+      200:
+        description: Games retrieved successfully
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              game_id:
+                type: integer
+              game_type:
+                type: string
+              game_result:
+                type: object
+              started_at:
+                type: string
+                format: date-time
+              stake_amount:
+                type: number
+              win_amount:
+                type: number
+              outcome:
+                type: string
+      401:
+        description: Not authenticated
+      403:
+        description: Admin access required
     """
     limit = request.args.get('limit', 50, type=int)
     offset = request.args.get('offset', 0, type=int)

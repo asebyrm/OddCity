@@ -3,10 +3,16 @@ import json
 from flask import Blueprint, request, jsonify, session
 from .database import get_db_connection
 from .auth import login_required
-from .rules import get_active_rule_value, get_active_rule_set_id, create_rule_snapshot
+from .rules import get_active_rule_value, get_active_rule_set_id
+from .utils.csrf import csrf_required
 from mysql.connector import Error
 
 blackjack_bp = Blueprint('blackjack', __name__)
+
+# Rate limiter
+def get_limiter():
+    from . import limiter
+    return limiter
 
 # Varsayılan Blackjack payouts (rule system'de kural yoksa kullanılır)
 DEFAULT_BLACKJACK_PAYOUT = 2.5  # 3:2 payout
@@ -88,7 +94,60 @@ def get_active_blackjack_game(cursor, user_id):
 @blackjack_bp.route('/game/blackjack/active', methods=['GET'])
 @login_required
 def check_active_game():
-    """Aktif blackjack oyunu var mı kontrol et"""
+    """
+    Check for active blackjack game
+
+    ---
+    tags:
+      - Games
+    summary: Check active blackjack game
+    description: Checks if the user has an active (unfinished) blackjack game.
+    security:
+      - session: []
+    responses:
+      200:
+        description: Active game status
+        schema:
+          type: object
+          properties:
+            has_active_game:
+              type: boolean
+              example: true
+            game_id:
+              type: integer
+              example: 123
+            bet_amount:
+              type: number
+              example: 50.00
+            player_hand:
+              type: array
+              items:
+                type: object
+                properties:
+                  suit:
+                    type: string
+                    example: H
+                  rank:
+                    type: string
+                    example: K
+            dealer_card:
+              type: object
+              properties:
+                suit:
+                  type: string
+                  example: S
+                rank:
+                  type: string
+                  example: A
+            player_value:
+              type: integer
+              example: 18
+            started_at:
+              type: string
+              format: date-time
+      401:
+        description: Not authenticated
+    """
     user_id = session.get('user_id')
     
     conn = get_db_connection()
@@ -122,8 +181,68 @@ def check_active_game():
 
 @blackjack_bp.route('/game/blackjack/resume', methods=['POST'])
 @login_required
+@csrf_required
 def resume_game():
-    """Aktif oyunu devam ettir"""
+    """
+    Resume an active blackjack game
+
+    ---
+    tags:
+      - Games
+    summary: Resume blackjack game
+    description: |
+      Resumes an interrupted blackjack game.
+      Loads the game state from the database.
+    security:
+      - session: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+    responses:
+      200:
+        description: Game resumed successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Game continues
+            player_hand:
+              type: array
+              items:
+                type: object
+            dealer_card:
+              type: object
+            player_value:
+              type: integer
+              example: 18
+            status:
+              type: string
+              example: playing
+            new_balance:
+              type: number
+              example: 450.00
+      401:
+        description: Not authenticated
+      403:
+        description: Invalid CSRF token
+      404:
+        description: No active game found
+    """
     user_id = session.get('user_id')
     
     conn = get_db_connection()
@@ -166,8 +285,87 @@ def resume_game():
 
 
 @blackjack_bp.route('/game/blackjack/start', methods=['POST'])
+@get_limiter().limit("30 per minute")  # Dakikada 30 yeni oyun
 @login_required
+@csrf_required
 def start_game():
+    """
+    Start a new blackjack game
+
+    ---
+    tags:
+      - Games
+    summary: Start blackjack game
+    description: |
+      Starts a new blackjack game with the specified bet amount.
+      Player receives 2 cards, dealer receives 1 visible card.
+      Cannot start if there's already an active game.
+    security:
+      - session: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - amount
+          properties:
+            amount:
+              type: number
+              format: float
+              minimum: 0.01
+              example: 50.00
+              description: Bet amount
+            csrf_token:
+              type: string
+              description: Alternative way to provide CSRF token
+    responses:
+      200:
+        description: Game started successfully
+        schema:
+          type: object
+          properties:
+            player_hand:
+              type: array
+              items:
+                type: object
+                properties:
+                  suit:
+                    type: string
+                  rank:
+                    type: string
+            dealer_card:
+              type: object
+              properties:
+                suit:
+                  type: string
+                rank:
+                  type: string
+            player_value:
+              type: integer
+              example: 15
+            status:
+              type: string
+              example: playing
+            new_balance:
+              type: number
+              example: 450.00
+      400:
+        description: Invalid amount, insufficient balance, or active game exists
+      401:
+        description: Not authenticated
+      403:
+        description: Invalid CSRF token
+    """
     user_id = session.get('user_id')
     data = request.get_json()
     
@@ -236,7 +434,9 @@ def start_game():
         random.shuffle(deck)
         
         player_hand = [deck.pop(), deck.pop()]
-        dealer_hand = [deck.pop(), deck.pop()]
+        # GÜVENLİK: Dealer'a sadece 1 kart ver, ikinci kartı oyun bitince çekeceğiz
+        # Bu sayede API yanıtında kapalı kart sızamaz
+        dealer_hand = [deck.pop()]
         
         # Oyun durumunu veritabanına kaydet
         save_game_state(cursor, game_id, deck, player_hand, dealer_hand, amount, wallet_id)
@@ -279,7 +479,69 @@ def start_game():
 
 @blackjack_bp.route('/game/blackjack/hit', methods=['POST'])
 @login_required
+@csrf_required
 def hit():
+    """
+    Draw a card in blackjack (Hit)
+
+    ---
+    tags:
+      - Games
+    summary: Blackjack Hit
+    description: |
+      Draws an additional card for the player.
+      If player exceeds 21 (bust), the game ends with a loss.
+    security:
+      - session: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+    responses:
+      200:
+        description: Card drawn
+        schema:
+          type: object
+          properties:
+            player_hand:
+              type: array
+              items:
+                type: object
+            player_value:
+              type: integer
+              example: 18
+            dealer_card:
+              type: object
+            dealer_value:
+              type: string
+              example: "?"
+            status:
+              type: string
+              enum: [playing, bust]
+              example: playing
+            message:
+              type: string
+              description: Present when game ends (bust)
+      400:
+        description: No active game
+      401:
+        description: Not authenticated
+      403:
+        description: Invalid CSRF token
+    """
     user_id = session.get('user_id')
     game = session.get('bj_game')
     
@@ -321,14 +583,22 @@ def hit():
         game_id = game['game_id']
         bet_id = game['bet_id']
         
-        # Rule snapshot oluştur
-        create_rule_snapshot(game_id, get_active_rule_set_id(), 'blackjack')
+        # GÜVENLİK: Transaction başlat
+        conn.start_transaction()
+        
+        # Dealer'ın ikinci kartını şimdi çek (oyuncu bust oldu, oyun bitti)
+        dealer_hand = game['dealer_hand']
+        while len(dealer_hand) < 2:
+            dealer_hand.append(deck.pop())
+        
+        dealer_value = calculate_hand_value(dealer_hand)
         
         # Game sonucunu kaydet
         game_result_json = json.dumps({
             'player_hand': player_hand,
-            'dealer_hand': game['dealer_hand'],
+            'dealer_hand': dealer_hand,
             'player_value': player_value,
+            'dealer_value': dealer_value,
             'result': 'bust',
             'payout': 0
         })
@@ -352,8 +622,8 @@ def hit():
         return jsonify({
             'player_hand': player_hand,
             'player_value': player_value,
-            'dealer_hand': game['dealer_hand'],
-            'dealer_value': calculate_hand_value(game['dealer_hand']),
+            'dealer_hand': dealer_hand,
+            'dealer_value': dealer_value,
             'status': 'bust',
             'message': 'Bust! Kaybettiniz.'
         })
@@ -363,10 +633,11 @@ def hit():
     cursor.close()
     conn.close()
     
+    # GÜVENLİK: Sadece dealer'ın açık kartını gönder, kapalı kart yok (henüz çekilmedi)
     return jsonify({
         'player_hand': player_hand,
         'player_value': player_value,
-        'dealer_hand': game['dealer_hand'],
+        'dealer_card': game['dealer_hand'][0],  # Sadece açık kart
         'dealer_value': '?',
         'status': 'playing'
     })
@@ -374,7 +645,80 @@ def hit():
 
 @blackjack_bp.route('/game/blackjack/stand', methods=['POST'])
 @login_required
+@csrf_required
 def stand():
+    """
+    Stand in blackjack (end turn)
+
+    ---
+    tags:
+      - Games
+    summary: Blackjack Stand
+    description: |
+      Player stands with current hand. Dealer draws cards until reaching 17 or higher.
+      Game result is determined based on final hand values.
+    security:
+      - session: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+    responses:
+      200:
+        description: Game finished
+        schema:
+          type: object
+          properties:
+            player_hand:
+              type: array
+              items:
+                type: object
+            dealer_hand:
+              type: array
+              items:
+                type: object
+            player_value:
+              type: integer
+              example: 19
+            dealer_value:
+              type: integer
+              example: 17
+            result:
+              type: string
+              enum: [win, lose, push, blackjack]
+              example: win
+            status:
+              type: string
+              example: finished
+            message:
+              type: string
+              example: "You won! (+100.00)"
+            payout:
+              type: number
+              example: 100.00
+            new_balance:
+              type: number
+              example: 550.00
+      400:
+        description: No active game
+      401:
+        description: Not authenticated
+      403:
+        description: Invalid CSRF token
+    """
     user_id = session.get('user_id')
     game = session.get('bj_game')
     
@@ -417,9 +761,24 @@ def handle_game_end(game_id, bet_id, wallet_id, amount, player_hand, dealer_hand
     try:
         conn.start_transaction()
         
+        # GÜVENLİK: Row lock ile race condition önle (payout için)
+        cursor.execute("SELECT balance FROM wallets WHERE wallet_id = %s FOR UPDATE", (wallet_id,))
+        wallet_row = cursor.fetchone()
+        if not wallet_row:
+            conn.rollback()
+            return jsonify({'message': 'Wallet bulunamadı!'}), 404
+        
         deck = session.get('bj_game', {}).get('deck', get_deck())
         
-        # Dealer draws
+        # GÜVENLİK: Dealer'ın ikinci kartını şimdi çek (oyun bitti)
+        # Dealer başlangıçta sadece 1 kart almıştı
+        while len(dealer_hand) < 2:
+            if deck:
+                dealer_hand.append(deck.pop())
+            else:
+                break
+        
+        # Dealer 17'ye kadar kart çekmeye devam eder
         while calculate_hand_value(dealer_hand) < 17:
             if deck:
                 dealer_hand.append(deck.pop())
@@ -464,10 +823,7 @@ def handle_game_end(game_id, bet_id, wallet_id, amount, player_hand, dealer_hand
             payout = amount
             message = 'Berabere! Bahis iade edildi.'
         
-        # Rule snapshot
-        create_rule_snapshot(game_id, get_active_rule_set_id(), 'blackjack')
-        
-        # Update balance if won
+        # Update balance if won (wallet zaten FOR UPDATE ile kilitli)
         if payout > 0:
             cursor.execute(
                 "UPDATE wallets SET balance = balance + %s WHERE wallet_id = %s",

@@ -3,10 +3,16 @@ import json
 from flask import Blueprint, request, jsonify, session
 from .database import get_db_connection
 from .auth import login_required
-from .rules import get_active_rule_value, get_active_rule_set_id, create_rule_snapshot
+from .rules import get_active_rule_value, get_active_rule_set_id
+from .utils.csrf import csrf_required
 from mysql.connector import Error
 
 roulette_bp = Blueprint('roulette', __name__)
+
+# Rate limiter
+def get_limiter():
+    from . import limiter
+    return limiter
 
 # Varsayılan Roulette Payouts (rule system'de kural yoksa kullanılır)
 DEFAULT_PAYOUTS = {
@@ -30,8 +36,97 @@ def get_parity(number):
     return 'even' if number % 2 == 0 else 'odd'
 
 @roulette_bp.route('/game/roulette/play', methods=['POST'])
+@get_limiter().limit("60 per minute")  # Dakikada 60 oyun
 @login_required
+@csrf_required
 def play_roulette():
+    """
+    Play a roulette game
+
+    ---
+    tags:
+      - Games
+    summary: Play Roulette
+    description: |
+      Places a bet on European roulette (numbers 0-36).
+      Bet types: number (straight up), color (red/black), parity (odd/even).
+      Payouts are based on active rule set.
+    security:
+      - session: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - amount
+            - bet_type
+            - bet_value
+          properties:
+            amount:
+              type: number
+              format: float
+              minimum: 0.01
+              example: 10.00
+              description: Bet amount
+            bet_type:
+              type: string
+              enum: [number, color, parity]
+              example: color
+              description: Type of bet
+            bet_value:
+              type: string
+              example: red
+              description: |
+                Bet value based on bet_type:
+                - number: 0-36
+                - color: red, black
+                - parity: odd, even
+            csrf_token:
+              type: string
+              description: Alternative way to provide CSRF token
+    responses:
+      200:
+        description: Game completed
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "YOU WON!"
+            winning_number:
+              type: integer
+              example: 7
+            winning_color:
+              type: string
+              example: red
+            is_win:
+              type: boolean
+              example: true
+            payout:
+              type: number
+              example: 20.00
+            new_balance:
+              type: number
+              example: 520.00
+      400:
+        description: Invalid bet type, value, or insufficient balance
+      401:
+        description: Not authenticated
+      403:
+        description: Invalid CSRF token
+      404:
+        description: Wallet not found
+    """
     user_id = session.get('user_id')
     data = request.get_json()
 
@@ -126,9 +221,6 @@ def play_roulette():
             is_win = (bet_value == winning_color)
         elif bet_type == 'parity':
             is_win = (bet_value == winning_parity)
-
-        # Rule snapshot oluştur (oyun oynandığında kullanılan rule değerlerini kaydet)
-        create_rule_snapshot(game_id, rule_set_id, 'roulette')
         
         # Game sonucunu kaydet
         game_result_json = json.dumps({

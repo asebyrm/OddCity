@@ -8,6 +8,7 @@ class AdminPanel {
         this.isLoggedIn = false;
         this.currentPage = 'dashboard';
         this.currentPeriod = 7;
+        this.csrfToken = null;
         
         this.init();
     }
@@ -67,6 +68,15 @@ class AdminPanel {
 
         // Game type filter
         document.getElementById('gameTypeFilter')?.addEventListener('change', () => this.loadGames());
+
+        // New Rule Set button
+        document.getElementById('newRuleSetBtn')?.addEventListener('click', () => this.openRuleSetModal());
+
+        // Rule Set form
+        document.getElementById('ruleSetForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.createRuleSet();
+        });
     }
 
     async checkAuth() {
@@ -79,6 +89,7 @@ class AdminPanel {
                 const user = await response.json();
                 if (user.is_admin) {
                     this.isLoggedIn = true;
+                    await this.fetchCsrfToken();
                     document.getElementById('loginModal').classList.add('hidden');
                     document.getElementById('adminEmail').textContent = user.email;
                 } else {
@@ -111,6 +122,7 @@ class AdminPanel {
             if (response.ok) {
                 if (data.is_admin) {
                     this.isLoggedIn = true;
+                    await this.fetchCsrfToken();
                     document.getElementById('loginModal').classList.add('hidden');
                     document.getElementById('adminEmail').textContent = email;
                     this.showNotification('Giriş başarılı!', 'success');
@@ -131,15 +143,54 @@ class AdminPanel {
         try {
             await fetch(`${this.apiUrl}/logout`, {
                 method: 'POST',
+                headers: this.getSecureHeaders(),
                 credentials: 'include'
             });
         } catch (error) {
             console.error('Logout error:', error);
         }
         
+        // Tüm client-side verileri temizle
         this.isLoggedIn = false;
+        this.csrfToken = null;
+        this.currentPage = 'dashboard';
+        this.currentPeriod = 7;
+        
+        // Dashboard verilerini temizle
+        document.getElementById('totalGames').textContent = '0';
+        document.getElementById('uniquePlayers').textContent = '0';
+        document.getElementById('totalBets').textContent = '₿0.00';
+        document.getElementById('houseProfit').textContent = '₿0.00';
+        
         document.getElementById('loginModal').classList.remove('hidden');
         this.showNotification('Çıkış yapıldı', 'success');
+    }
+
+    // ========================================
+    // CSRF Token Methods
+    // ========================================
+
+    async fetchCsrfToken() {
+        try {
+            const response = await fetch(`${this.apiUrl}/csrf-token`, {
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.csrfToken = data.csrf_token;
+            }
+        } catch (error) {
+            console.error('CSRF token fetch error:', error);
+        }
+    }
+
+    getSecureHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.csrfToken) {
+            headers['X-CSRF-Token'] = this.csrfToken;
+        }
+        return headers;
     }
 
     navigateTo(page) {
@@ -213,21 +264,41 @@ class AdminPanel {
                 document.getElementById('houseProfit').textContent = `₿${houseProfit.toFixed(2)}`;
 
                 // Update win rate
-                const winRate = data.games?.win_rate || 0;
-                document.getElementById('winRate').textContent = `${winRate.toFixed(1)}%`;
-                document.querySelector('.win-rate-circle').style.background = 
-                    `conic-gradient(var(--success) ${winRate * 3.6}deg, var(--bg-primary) ${winRate * 3.6}deg)`;
+                const winRate = parseFloat(data.games?.win_rate) || 0;
+                const winRateEl = document.getElementById('winRate');
+                const winRateCircle = document.querySelector('.win-rate-circle');
+                
+                if (winRateEl) {
+                    winRateEl.textContent = `${winRate.toFixed(1)}%`;
+                }
+                if (winRateCircle) {
+                    const degrees = winRate * 3.6;
+                    winRateCircle.style.background = 
+                        `conic-gradient(var(--success) ${degrees}deg, var(--bg-tertiary) ${degrees}deg)`;
+                }
+                
+                console.log('Win rate:', winRate);
 
                 // Update game distribution
                 this.renderGameDistribution(data.games?.by_type || [], totalGames);
 
                 // Update transactions
-                if (data.transactions) {
-                    const deposits = data.transactions.find(t => t.tx_type === 'DEPOSIT') || { total_amount: 0 };
-                    const withdraws = data.transactions.find(t => t.tx_type === 'WITHDRAW') || { total_amount: 0 };
-                    document.getElementById('totalDeposits').textContent = `₿${parseFloat(deposits.total_amount || 0).toFixed(2)}`;
-                    document.getElementById('totalWithdraws').textContent = `₿${parseFloat(withdraws.total_amount || 0).toFixed(2)}`;
+                const transactions = data.transactions || [];
+                const deposits = transactions.find(t => t.tx_type === 'DEPOSIT') || { total_amount: 0 };
+                const withdraws = transactions.find(t => t.tx_type === 'WITHDRAW') || { total_amount: 0 };
+                
+                const totalDepositsEl = document.getElementById('totalDeposits');
+                const totalWithdrawsEl = document.getElementById('totalWithdraws');
+                
+                if (totalDepositsEl) {
+                    totalDepositsEl.textContent = `₿${parseFloat(deposits.total_amount || 0).toFixed(2)}`;
                 }
+                if (totalWithdrawsEl) {
+                    totalWithdrawsEl.textContent = `₿${parseFloat(withdraws.total_amount || 0).toFixed(2)}`;
+                }
+                
+                console.log('Transactions data:', transactions);
+                console.log('Deposits:', deposits, 'Withdraws:', withdraws);
             } else {
                 console.error('Stats API error:', response.status);
             }
@@ -238,16 +309,18 @@ class AdminPanel {
 
     renderGameDistribution(gameTypes, total) {
         const container = document.getElementById('gameDistribution');
+        if (!container) return;
+        
+        console.log('Rendering game distribution:', gameTypes, 'Total:', total);
         
         // Eğer veri yoksa default göster
         if (!gameTypes || gameTypes.length === 0) {
             // Default oyun tipleri göster (henüz oyun yok)
-            const defaultGames = [
+            gameTypes = [
                 { game_type: 'coinflip', count: 0 },
                 { game_type: 'roulette', count: 0 },
                 { game_type: 'blackjack', count: 0 }
             ];
-            gameTypes = defaultGames;
         }
 
         const gameNames = {
@@ -256,14 +329,18 @@ class AdminPanel {
             'blackjack': '🃏 Blackjack'
         };
 
+        // Sort by count descending
+        gameTypes.sort((a, b) => (b.count || 0) - (a.count || 0));
+
         container.innerHTML = gameTypes.map(game => {
-            const count = game.count || 0;
+            const count = parseInt(game.count) || 0;
             const percentage = total > 0 ? (count / total * 100) : 0;
+            const minWidth = total === 0 ? 5 : Math.max(percentage, 2);
             return `
                 <div class="game-bar">
                     <span class="game-bar-label">${gameNames[game.game_type] || game.game_type}</span>
                     <div class="game-bar-track">
-                        <div class="game-bar-fill ${game.game_type}" style="width: ${Math.max(percentage, 2)}%"></div>
+                        <div class="game-bar-fill ${game.game_type}" style="width: ${minWidth}%"></div>
                     </div>
                     <span class="game-bar-value">${count}</span>
                 </div>
@@ -479,6 +556,7 @@ class AdminPanel {
         try {
             const response = await fetch(`${this.apiUrl}/admin/user/${userId}/ban`, {
                 method: 'POST',
+                headers: this.getSecureHeaders(),
                 credentials: 'include'
             });
 
@@ -499,6 +577,7 @@ class AdminPanel {
         try {
             const response = await fetch(`${this.apiUrl}/admin/user/${userId}/unban`, {
                 method: 'POST',
+                headers: this.getSecureHeaders(),
                 credentials: 'include'
             });
 
@@ -630,6 +709,9 @@ class AdminPanel {
                                     <button class="btn-success" onclick="adminPanel.activateRuleSet(${rs.rule_set_id})">
                                         ✓ Aktif Et
                                     </button>
+                                    <button class="btn-danger" onclick="adminPanel.deleteRuleSet(${rs.rule_set_id}, '${rs.name}')">
+                                        🗑️ Sil
+                                    </button>
                                 ` : `
                                     <button class="btn-secondary" disabled>Aktif</button>
                                 `}
@@ -653,6 +735,7 @@ class AdminPanel {
         try {
             const response = await fetch(`${this.apiUrl}/admin/rule-sets/${ruleSetId}/activate`, {
                 method: 'POST',
+                headers: this.getSecureHeaders(),
                 credentials: 'include'
             });
 
@@ -665,6 +748,113 @@ class AdminPanel {
             }
         } catch (error) {
             console.error('Activate rule set error:', error);
+            this.showNotification('Bağlantı hatası!', 'error');
+        }
+    }
+
+    async deleteRuleSet(ruleSetId, ruleSetName) {
+        if (!confirm(`"${ruleSetName}" kural setini silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiUrl}/admin/rule-sets/${ruleSetId}`, {
+                method: 'DELETE',
+                headers: this.getSecureHeaders(),
+                credentials: 'include'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showNotification(data.message || 'Rule set silindi!', 'success');
+                this.loadRuleSets();
+            } else {
+                this.showNotification(data.message || 'Silme işlemi başarısız!', 'error');
+            }
+        } catch (error) {
+            console.error('Delete rule set error:', error);
+            this.showNotification('Bağlantı hatası!', 'error');
+        }
+    }
+
+    openRuleSetModal() {
+        // Reset form to defaults
+        document.getElementById('rsName').value = '';
+        document.getElementById('rsDescription').value = '';
+        document.getElementById('rsHouseEdge').value = '5';
+        document.getElementById('rsCoinflip').value = '1.95';
+        document.getElementById('rsRouletteNumber').value = '35';
+        document.getElementById('rsRouletteColor').value = '1';
+        document.getElementById('rsRouletteParity').value = '1';
+        document.getElementById('rsBlackjack').value = '2.5';
+        document.getElementById('rsBlackjackNormal').value = '2';
+        
+        document.getElementById('ruleSetModal').classList.remove('hidden');
+    }
+
+    async createRuleSet() {
+        const name = document.getElementById('rsName').value.trim();
+        const description = document.getElementById('rsDescription').value.trim();
+        const houseEdge = parseFloat(document.getElementById('rsHouseEdge').value);
+        
+        if (!name) {
+            this.showNotification('Rule set adı gereklidir!', 'error');
+            return;
+        }
+
+        // Collect rule values
+        const rules = [
+            { rule_type: 'coinflip_payout', rule_param: document.getElementById('rsCoinflip').value },
+            { rule_type: 'roulette_number_payout', rule_param: document.getElementById('rsRouletteNumber').value },
+            { rule_type: 'roulette_color_payout', rule_param: document.getElementById('rsRouletteColor').value },
+            { rule_type: 'roulette_parity_payout', rule_param: document.getElementById('rsRouletteParity').value },
+            { rule_type: 'blackjack_payout', rule_param: document.getElementById('rsBlackjack').value },
+            { rule_type: 'blackjack_normal_payout', rule_param: document.getElementById('rsBlackjackNormal').value }
+        ];
+
+        try {
+            // 1. Create rule set
+            const rsResponse = await fetch(`${this.apiUrl}/admin/rule-sets`, {
+                method: 'POST',
+                headers: this.getSecureHeaders(),
+                credentials: 'include',
+                body: JSON.stringify({ name, description, house_edge: houseEdge })
+            });
+
+            if (!rsResponse.ok) {
+                const data = await rsResponse.json();
+                this.showNotification(data.message || 'Rule set oluşturulamadı!', 'error');
+                return;
+            }
+
+            const rsData = await rsResponse.json();
+            const ruleSetId = rsData.rule_set_id;
+
+            // 2. Add each rule
+            let successCount = 0;
+            for (const rule of rules) {
+                const ruleResponse = await fetch(`${this.apiUrl}/admin/rule-sets/${ruleSetId}/rules`, {
+                    method: 'POST',
+                    headers: this.getSecureHeaders(),
+                    credentials: 'include',
+                    body: JSON.stringify(rule)
+                });
+
+                if (ruleResponse.ok) {
+                    successCount++;
+                } else {
+                    console.error(`Failed to add rule: ${rule.rule_type}`);
+                }
+            }
+
+            // 3. Close modal and refresh
+            document.getElementById('ruleSetModal').classList.add('hidden');
+            this.showNotification(`Rule set "${name}" oluşturuldu! (${successCount} kural eklendi)`, 'success');
+            this.loadRuleSets();
+
+        } catch (error) {
+            console.error('Create rule set error:', error);
             this.showNotification('Bağlantı hatası!', 'error');
         }
     }
@@ -724,6 +914,11 @@ class AdminPanel {
 // Close user modal
 function closeUserModal() {
     document.getElementById('userDetailModal').classList.add('hidden');
+}
+
+// Close rule set modal
+function closeRuleSetModal() {
+    document.getElementById('ruleSetModal').classList.add('hidden');
 }
 
 // Hide notification

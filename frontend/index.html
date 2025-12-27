@@ -294,6 +294,28 @@
                         </div>
                     </div>
 
+                    <!-- Şifre Değiştirme -->
+                    <div class="profile-settings">
+                        <h3>🔐 Şifre Değiştir</h3>
+                        <form id="changePasswordForm" class="password-form">
+                            <div class="form-row">
+                                <div class="input-group">
+                                    <label for="currentPassword">Mevcut Şifre</label>
+                                    <input type="password" id="currentPassword" placeholder="••••••" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="newPassword">Yeni Şifre</label>
+                                    <input type="password" id="newPassword" placeholder="Min. 6 karakter" minlength="6" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="confirmPassword">Yeni Şifre (Tekrar)</label>
+                                    <input type="password" id="confirmPassword" placeholder="••••••" minlength="6" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-change-password">Şifreyi Değiştir</button>
+                        </form>
+                    </div>
+
                     <div class="profile-games">
                         <div class="profile-games-header">
                             <h3>Oyun Geçmişi</h3>

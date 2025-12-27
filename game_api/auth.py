@@ -3,9 +3,15 @@ from flask import jsonify, request, session, Blueprint
 from werkzeug.security import generate_password_hash, check_password_hash
 from .database import get_db_connection
 from .utils.logger import auth_logger
+from .utils.csrf import get_csrf_token, csrf_required
 from mysql.connector import Error
 
 auth_bp = Blueprint('auth', __name__)
+
+# Rate limiter import (circular import önlemek için lazy import)
+def get_limiter():
+    from . import limiter
+    return limiter
 
 
 def login_required(f):
@@ -30,7 +36,57 @@ def admin_required(f):
 
 
 @auth_bp.route('/register', methods=['POST'])
+@get_limiter().limit("5 per hour")  # Saatte 5 kayıt (spam koruması)
 def register_user():
+    """
+    Register a new user account
+
+    ---
+    tags:
+      - Authentication
+    summary: User registration
+    description: |
+      Creates a new user account with email and password.
+      A wallet is automatically created for the new user.
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - email
+            - password
+          properties:
+            email:
+              type: string
+              format: email
+              example: newuser@example.com
+            password:
+              type: string
+              format: password
+              example: securePassword123
+    responses:
+      201:
+        description: User created successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: User and wallet created successfully!
+            user_id:
+              type: integer
+              example: 5
+      400:
+        description: Invalid email or password format
+      409:
+        description: Email already exists
+      500:
+        description: Server error
+    """
     from .utils.validators import validate_email, validate_password
     
     data = request.get_json()
@@ -74,7 +130,47 @@ def register_user():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@get_limiter().limit("10 per minute")  # Dakikada 10 deneme (brute force koruması)
 def login_user():
+    """
+    User login endpoint (Session-based authentication)
+
+    ---
+    tags:
+      - Authentication
+    summary: User login
+    description: |
+      Authenticates a user using email and password.
+      On success, a server-side session is created and stored securely.
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - email
+            - password
+          properties:
+            email:
+              type: string
+              format: email
+              example: user@example.com
+            password:
+              type: string
+              format: password
+              example: strongPassword123
+    responses:
+      200:
+        description: Login successful. Session created.
+      401:
+        description: Invalid email or password.
+      400:
+        description: Missing or invalid request body.
+    """
+    
     data = request.get_json()
     if not data or 'email' not in data or 'password' not in data:
         return jsonify({'message': 'E-posta ve şifre gereklidir!'}), 400
@@ -127,6 +223,14 @@ def login_user():
                     'started_at': active_game['started_at'].isoformat() if active_game['started_at'] else None
                 }
             
+            # Login log kaydı
+            ip_address = request.remote_addr
+            cursor.execute(
+                "INSERT INTO logs (user_id, action_type, ip_address) VALUES (%s, 'LOGIN', %s)",
+                (user['user_id'], ip_address)
+            )
+            conn.commit()
+            
             return jsonify(response_data), 200
         else:
             return jsonify({'message': 'Geçersiz e-posta veya şifre!'}), 401
@@ -140,15 +244,150 @@ def login_user():
 
 @auth_bp.route('/logout', methods=['POST'])
 @login_required
+@csrf_required
 def logout_user():
+    """
+    User logout endpoint
+
+    ---
+    tags:
+      - Authentication
+    summary: User logout
+    description: |
+      Ends the current user session and logs the action.
+      Requires CSRF token for security.
+    security:
+      - session: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token obtained from /csrf-token endpoint
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+              description: Alternative way to provide CSRF token
+    responses:
+      200:
+        description: Logout successful
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Successfully logged out.
+      401:
+        description: Not authenticated
+      403:
+        description: Invalid or missing CSRF token
+    """
+    user_id = session.get('user_id')
+    
+    # Logout log kaydı
+    try:
+        conn = get_db_connection()
+        if conn:
+            cursor = conn.cursor()
+            ip_address = request.remote_addr
+            cursor.execute(
+                "INSERT INTO logs (user_id, action_type, ip_address) VALUES (%s, 'LOGOUT', %s)",
+                (user_id, ip_address)
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+    except Error:
+        pass  # Log hatası kritik değil
+    
     session.clear()
     return jsonify({'message': 'Başarıyla çıkış yapıldı.'}), 200
+
+
+@auth_bp.route('/csrf-token', methods=['GET'])
+@login_required
+def get_csrf_token_endpoint():
+    """
+    Get CSRF token for secure operations
+
+    ---
+    tags:
+      - Authentication
+    summary: Get CSRF token
+    description: |
+      Returns a CSRF token required for all state-changing operations
+      (POST, PUT, DELETE). Token is valid for 24 hours.
+      Include this token in the X-CSRF-Token header or in request body as csrf_token.
+    security:
+      - session: []
+    responses:
+      200:
+        description: CSRF token returned successfully
+        schema:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+              example: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+      401:
+        description: Not authenticated
+    """
+    token = get_csrf_token()
+    return jsonify({'csrf_token': token})
 
 
 @auth_bp.route('/me', methods=['GET'])
 @login_required
 def get_current_user():
-    """Mevcut kullanıcı bilgilerini getir"""
+    """
+    Get current user information
+
+    ---
+    tags:
+      - User
+    summary: Get current user profile
+    description: Returns the authenticated user's profile information including wallet balance.
+    security:
+      - session: []
+    responses:
+      200:
+        description: User information retrieved successfully
+        schema:
+          type: object
+          properties:
+            user_id:
+              type: integer
+              example: 1
+            email:
+              type: string
+              example: user@example.com
+            status:
+              type: string
+              enum: [ACTIVE, BANNED]
+              example: ACTIVE
+            is_admin:
+              type: boolean
+              example: false
+            created_at:
+              type: string
+              format: date-time
+            balance:
+              type: number
+              format: float
+              example: 500.00
+      401:
+        description: Not authenticated
+      404:
+        description: User not found
+    """
     user_id = session.get('user_id')
     
     conn = get_db_connection()
@@ -183,7 +422,59 @@ def get_current_user():
 @auth_bp.route('/me/games', methods=['GET'])
 @login_required
 def get_my_games():
-    """Kullanıcının kendi oyun geçmişi"""
+    """
+    Get current user's game history
+
+    ---
+    tags:
+      - User
+    summary: Get user's game history
+    description: Returns a paginated list of games played by the authenticated user.
+    security:
+      - session: []
+    parameters:
+      - in: query
+        name: limit
+        type: integer
+        default: 20
+        description: Maximum number of games to return
+      - in: query
+        name: offset
+        type: integer
+        default: 0
+        description: Number of games to skip for pagination
+      - in: query
+        name: game_type
+        type: string
+        enum: [coinflip, roulette, blackjack]
+        description: Filter by game type
+    responses:
+      200:
+        description: Game history retrieved successfully
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              game_id:
+                type: integer
+              game_type:
+                type: string
+              game_result:
+                type: object
+              started_at:
+                type: string
+                format: date-time
+              stake_amount:
+                type: number
+              win_amount:
+                type: number
+              outcome:
+                type: string
+                enum: [WIN, LOSS]
+      401:
+        description: Not authenticated
+    """
     from .services.game_service import GameService
     
     user_id = session.get('user_id')
@@ -198,7 +489,57 @@ def get_my_games():
 @auth_bp.route('/me/stats', methods=['GET'])
 @login_required
 def get_my_stats():
-    """Kullanıcının oyun istatistikleri"""
+    """
+    Get current user's game statistics
+
+    ---
+    tags:
+      - User
+    summary: Get user's game statistics
+    description: Returns aggregated statistics for the authenticated user's games.
+    security:
+      - session: []
+    parameters:
+      - in: query
+        name: days
+        type: integer
+        default: 30
+        description: Number of days to include in statistics
+      - in: query
+        name: game_type
+        type: string
+        enum: [coinflip, roulette, blackjack]
+        description: Filter by game type
+    responses:
+      200:
+        description: Statistics retrieved successfully
+        schema:
+          type: object
+          properties:
+            total_games:
+              type: integer
+              example: 50
+            total_bets:
+              type: number
+              example: 500.00
+            total_payouts:
+              type: number
+              example: 480.00
+            win_count:
+              type: integer
+              example: 25
+            loss_count:
+              type: integer
+              example: 25
+            win_rate:
+              type: number
+              example: 50.00
+            profit:
+              type: number
+              example: 20.00
+      401:
+        description: Not authenticated
+    """
     from .services.game_service import GameService
     
     user_id = session.get('user_id')
@@ -207,3 +548,111 @@ def get_my_stats():
     
     stats = GameService.get_game_stats(user_id, game_type, days)
     return jsonify(stats)
+
+
+@auth_bp.route('/me/password', methods=['PUT'])
+@login_required
+@csrf_required
+def change_password():
+    """
+    Change user password
+
+    ---
+    tags:
+      - User
+    summary: Change password
+    description: |
+      Updates the authenticated user's password.
+      Requires current password verification and CSRF token.
+    security:
+      - session: []
+      - csrf: []
+    consumes:
+      - application/json
+    parameters:
+      - in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+        description: CSRF token
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - current_password
+            - new_password
+          properties:
+            current_password:
+              type: string
+              format: password
+              example: oldPassword123
+            new_password:
+              type: string
+              format: password
+              example: newSecurePassword456
+            csrf_token:
+              type: string
+              description: Alternative way to provide CSRF token
+    responses:
+      200:
+        description: Password changed successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Password changed successfully!
+      400:
+        description: Invalid new password format
+      401:
+        description: Current password incorrect or not authenticated
+      403:
+        description: Invalid CSRF token
+    """
+    from .utils.validators import validate_password
+    
+    user_id = session.get('user_id')
+    data = request.get_json()
+    
+    if not data or 'current_password' not in data or 'new_password' not in data:
+        return jsonify({'message': 'Mevcut şifre ve yeni şifre gereklidir!'}), 400
+    
+    current_password = data['current_password']
+    new_password = data['new_password']
+    
+    # Yeni şifre validasyonu
+    is_valid, error = validate_password(new_password)
+    if not is_valid:
+        return jsonify({'message': error}), 400
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'message': 'Veritabanı hatası'}), 500
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Mevcut şifreyi kontrol et
+        cursor.execute("SELECT password_hash FROM users WHERE user_id = %s", (user_id,))
+        user = cursor.fetchone()
+        
+        if not user or not check_password_hash(user['password_hash'], current_password):
+            return jsonify({'message': 'Mevcut şifre yanlış!'}), 401
+        
+        # Yeni şifreyi hashle ve güncelle
+        new_hash = generate_password_hash(new_password)
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE user_id = %s",
+            (new_hash, user_id)
+        )
+        conn.commit()
+        
+        return jsonify({'message': 'Şifre başarıyla değiştirildi!'})
+        
+    except Error as e:
+        conn.rollback()
+        return jsonify({'message': f'Hata: {e}'}), 500
+    finally:
+        cursor.close()
+        conn.close()
