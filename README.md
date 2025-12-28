@@ -116,7 +116,7 @@ The database consists of **9 main tables** with proper relationships:
 │ status      │
 └──────┬──────┘
        │
-       │ 1:N
+    1:1│                                1:N
        ├─────────────────────────────────────┐
        │                                     │
 ┌──────▼──────┐                    ┌─────────▼─────────┐
