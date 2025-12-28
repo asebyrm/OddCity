@@ -1,7 +1,13 @@
 import os
 from datetime import timedelta
 
+
 class Config:
+
+    DEBUG = False
+    TESTING = False
+    ENV = "production"
+
     DB_CONFIG = {
         'host': 'localhost',
         'user': 'root',

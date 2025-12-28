@@ -4,6 +4,29 @@
 
 ---
 
+## ⚠️ IMPORTANT DISCLAIMER
+
+**This project is an academic assignment developed solely for educational purposes.**
+
+This application was created as part of a university course project to develop and demonstrate skills in:
+- Backend development (Python/Flask)
+- Frontend development (HTML/CSS/JavaScript)
+- Database design and management (MySQL)
+- RESTful API development
+- Authentication and security implementations
+
+### Legal Notice
+
+- ❌ **This project is NOT intended for commercial use**
+- ❌ **This project is NOT intended for real gambling or betting**
+- ❌ **This project does NOT involve real money transactions**
+- ❌ **This project should NOT be used for any illegal activities**
+- ✅ **This is purely a technical demonstration for academic evaluation**
+
+All "virtual currency" in this application is fictional and has no real-world value. The gambling mechanics are implemented purely to demonstrate database transactions, API design, and state management concepts.
+
+---
+
 ## Table of Contents
 1. [Project Overview](#1-project-overview)
 2. [Database Choice and Design](#2-database-choice-and-design)
@@ -15,6 +38,7 @@
 8. [Security Features](#8-security-features)
 9. [API Testing Guide](#9-api-testing-guide)
 10. [Swagger API Documentation](#10-swagger-api-documentation)
+11. [Challenges Faced During Development](#11-challenges-faced-during-development)
 
 ---
 
@@ -996,6 +1020,88 @@ For testing purposes, you can use the default admin account:
 | Password | `admin` |
 
 ---
+
+---
+
+## 11. Challenges Faced During Development
+
+Throughout the development of this project, several technical challenges were encountered and resolved:
+
+### 11.1 Blackjack Game State Management
+
+**Problem:** The Blackjack game requires maintaining state across multiple API calls (start → hit/stand → end). Initially, the game state was only stored in the session, which caused issues when:
+- Users closed the browser and returned
+- Session expired mid-game
+- Multiple API calls created race conditions
+
+**Solution:** Implemented a dual-storage approach:
+- Game state is saved to the database (`games.game_state` column as JSON)
+- Session is used as a cache for performance
+- Added `resume` endpoint to recover interrupted games
+- Implemented automatic cleanup for orphaned games
+
+### 11.2 Duplicate Game Creation Bug
+
+**Problem:** A critical bug was discovered where the Blackjack `start_game` function had a duplicate `cursor.execute()` call, causing:
+- Two ACTIVE games to be created instead of one
+- The bet was only linked to the second game
+- After finishing, one game remained as ACTIVE with no game_state
+- Users couldn't start new games ("active game exists") or resume ("game not found")
+
+**Solution:** 
+- Removed the duplicate INSERT statement
+- Added validation in `start_game` to detect and auto-cancel orphaned games
+- Added cleanup logic in `resume_game` to handle corrupted game states
+
+### 11.3 CSRF Token Implementation
+
+**Problem:** Implementing CSRF protection for a REST API while maintaining usability was challenging:
+- Traditional form-based CSRF doesn't work well with JSON APIs
+- Needed to support both header-based and body-based token submission
+- Token expiration and regeneration logic
+
+**Solution:**
+- Created a flexible `csrf_required` decorator that checks:
+  1. `X-CSRF-Token` header (preferred)
+  2. `csrf_token` field in JSON body (fallback)
+- Implemented token expiration (1 hour validity)
+- Added `/csrf-token` endpoint for token retrieval
+- Documented CSRF requirements in Swagger for each endpoint
+
+### 11.4 Race Conditions in Wallet Transactions
+
+**Problem:** Concurrent requests could cause incorrect balance updates:
+- Two simultaneous bets could both pass balance check
+- Withdrawals and deposits could overlap incorrectly
+
+**Solution:**
+- Used MySQL transactions with `START TRANSACTION` and `COMMIT`
+- Implemented row-level locking with `SELECT ... FOR UPDATE`
+- Ensured atomic operations for all balance modifications
+
+### 11.5 Dealer Card Security in Blackjack
+
+**Problem:** Initially, the dealer was dealt 2 cards at game start, and both were stored in the game state. This created a security vulnerability where the hidden card could potentially be leaked through API responses or database inspection.
+
+**Solution:**
+- Dealer now receives only 1 card at game start
+- Second card is drawn only when the game ends (stand or bust)
+- API response only shows `dealer_card` (single card) during gameplay
+- Full `dealer_hand` is revealed only in the final response
+
+### 11.6 Session Management Across Requests
+
+**Problem:** Flask-Session with filesystem storage had issues:
+- Session data wasn't always persisting correctly
+- Concurrent requests sometimes read stale session data
+
+**Solution:**
+- Configured proper session settings (HTTPONLY, SAMESITE)
+- Reduced reliance on session for critical game data (moved to database)
+- Added proper session cleanup on logout
+
+---
+
 
 ## Summary
 
